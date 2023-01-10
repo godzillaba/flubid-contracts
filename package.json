@@ -1,0 +1,10 @@
+{
+  "name": "super-auction",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Henry <11198460+godzillaba@users.noreply.github.com>",
+  "license": "MIT",
+  "scripts": {
+    "test": "forge test --fork-url https://eth.llamarpc.com --fork-block-number 16377651"
+  }
+}
