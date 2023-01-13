@@ -47,12 +47,12 @@ contract RentalAuction is SuperAppBase {
 
     address public receiver;
 
-    /// @dev Linked list node
-    /// @dev each node is looked up by sender
+    /// @dev Linked list node for storing senders and their flow rates in ascending order
     /// @dev left is the node/sender to the left, right is right
     /// @dev if left = address(0), then it is the first item in the list
     /// @dev similarly, if right = address(0), then it is the last item in the list
-    struct SenderInfoListNode { // TODO: rename this to something like SenderInfo or SenderInfoListNode
+    /// @dev no two senders can have equal flowRate
+    struct SenderInfoListNode {
         address left;
         address right;
 
@@ -60,6 +60,7 @@ contract RentalAuction is SuperAppBase {
         int96 flowRate;
     }
 
+    /// @dev mapping containing linked list of senders' flow rates in ascending order
     mapping(address => SenderInfoListNode) public senderInfo;
 
     // TODO: mapping address to bytes (bytes is a user defined message passed when creating/updating a stream)
@@ -103,79 +104,6 @@ contract RentalAuction is SuperAppBase {
         if (superToken != acceptedToken) revert InvalidToken();
         if (agreementClass != address(cfa)) revert InvalidAgreement();
         _;
-    }
-
-    // assumes that sender already exists in the list
-    function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
-        SenderInfoListNode storage node = senderInfo[sender];
-        address left = node.left;
-        
-        if (right == node.right) {
-            if (left != address(0) && newRate <= senderInfo[node.left].flowRate) revert PosTooHigh();
-            if (right != address(0) && newRate >= senderInfo[right].flowRate) revert PosTooLow();
-
-            node.flowRate = newRate;
-        }
-        else {
-            _removeSenderInfoListNode(sender);
-            _insertSenderInfoListNode(newRate, sender, right);
-        }
-    }
-
-    // assumes that sender exists in the list
-    function _removeSenderInfoListNode(address sender) internal {
-        SenderInfoListNode storage center = senderInfo[sender];
-
-        if (center.left != address(0)) {
-            senderInfo[center.left].right = center.right;
-        }
-        
-        if (center.right != address(0)) {
-            senderInfo[center.right].left = center.left;
-        }
-        else {
-            // this is topStreamer
-            require(sender == topStreamer, "TODO REMOVE DEBUG 1");
-            topStreamer = center.left;
-        }
-
-        center.left = address(0);
-        center.right = address(0);
-    }
-
-    // TODO: maybe put this stuff in abstract contract? would be better for testing OR just make it internal, derive a test contract from this one
-    // newRate cannot be equal to any other incoming stream. must be strictly less than right and strictly more than left
-    // assumes that newSender is not already in the list
-    function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
-        address left;
-        if (right == address(0)) {
-            left = topStreamer;
-
-            topStreamer = newSender;
-        }
-        else {
-            left = senderInfo[right].left;
-        }
-
-        if (right != address(0)) {
-            // make sure inFlowRate is less than rightFlowRate
-            if (newRate >= senderInfo[right].flowRate) revert PosTooLow();
-
-            senderInfo[right].left = newSender;
-        }
-
-        if (left != address(0)) {
-            // make sure inFlowRate is greater than rightFlowRate
-            if (newRate <= senderInfo[left].flowRate) revert PosTooHigh();
-
-            senderInfo[left].right = newSender;
-        }
-
-        SenderInfoListNode storage newNode = senderInfo[newSender];
-        newNode.left = left;
-        newNode.right = right;
-        newNode.sender = newSender;
-        newNode.flowRate = newRate;
     }
 
     function afterAgreementCreated(
@@ -272,5 +200,82 @@ contract RentalAuction is SuperAppBase {
         // update winner and previous winner streams
         // CANNOT REVERT HERE
         newCtx = _ctx;
+    }
+
+    /*******************************************************
+     * 
+     * Linked List Operations
+     * 
+     *******************************************************/
+
+    // assumes that sender already exists in the list
+    function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
+        SenderInfoListNode storage node = senderInfo[sender];
+        address left = node.left;
+        
+        if (right == node.right) {
+            if (left != address(0) && newRate <= senderInfo[node.left].flowRate) revert PosTooHigh();
+            if (right != address(0) && newRate >= senderInfo[right].flowRate) revert PosTooLow();
+
+            node.flowRate = newRate;
+        }
+        else {
+            _removeSenderInfoListNode(sender);
+            _insertSenderInfoListNode(newRate, sender, right);
+        }
+    }
+
+    // assumes that sender exists in the list
+    function _removeSenderInfoListNode(address sender) internal {
+        SenderInfoListNode storage center = senderInfo[sender];
+
+        if (center.left != address(0)) {
+            senderInfo[center.left].right = center.right;
+        }
+        
+        if (center.right != address(0)) {
+            senderInfo[center.right].left = center.left;
+        }
+        else {
+            // this is topStreamer
+            require(sender == topStreamer, "TODO REMOVE DEBUG 1");
+            topStreamer = center.left;
+        }
+
+        center.left = address(0);
+        center.right = address(0);
+    }
+
+    // assumes that newSender is not already in the list
+    function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
+        address left;
+        if (right == address(0)) {
+            left = topStreamer;
+
+            topStreamer = newSender;
+        }
+        else {
+            left = senderInfo[right].left;
+        }
+
+        if (right != address(0)) {
+            // make sure inFlowRate is less than rightFlowRate
+            if (newRate >= senderInfo[right].flowRate) revert PosTooLow();
+
+            senderInfo[right].left = newSender;
+        }
+
+        if (left != address(0)) {
+            // make sure inFlowRate is greater than rightFlowRate
+            if (newRate <= senderInfo[left].flowRate) revert PosTooHigh();
+
+            senderInfo[left].right = newSender;
+        }
+
+        SenderInfoListNode storage newNode = senderInfo[newSender];
+        newNode.left = left;
+        newNode.right = right;
+        newNode.sender = newSender;
+        newNode.flowRate = newRate;
     }
 }
