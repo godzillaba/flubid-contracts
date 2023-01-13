@@ -20,7 +20,24 @@ error PosTooLow();
 // TODO replace this everywhere
 error Unknown();
 
-contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
+
+
+/*
+
+TODO:
+
+constructor arg for IRentalAuctionControllerObserver (or IRentalAuctionEventHandler, IRentalAuctionHooks, IRentalAuctionController). A contract that gets called when a new winner is assigned (and can also cancel the auction)
+    must be erc165 
+supportsInterface
+
+a func on RentalAuction called something like closeAuction(). 
+    This function must have some type of access control. 
+    It is used to stop the auction and redirect any streams back to senders. 
+    now revert on afterAgreementCreated
+
+*/
+
+contract RentalAuction is SuperAppBase {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
     
@@ -35,7 +52,7 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
     /// @dev left is the node/sender to the left, right is right
     /// @dev if left = address(0), then it is the first item in the list
     /// @dev similarly, if right = address(0), then it is the last item in the list
-    struct LinkedListNode {
+    struct SenderInfoListNode { // TODO: rename this to something like SenderInfo or SenderInfoListNode
         address left;
         address right;
 
@@ -43,7 +60,9 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
         int96 flowRate;
     }
 
-    mapping(address => LinkedListNode) public linkedListNodes;
+    mapping(address => SenderInfoListNode) public senderInfo;
+
+    // TODO: mapping address to bytes (bytes is a user defined message passed when creating/updating a stream)
 
     /// @dev The sender of the stream with the highest flowrate. When 0 there are now incoming streams
     address public topStreamer;
@@ -86,8 +105,48 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
         _;
     }
 
-    // TODO: maybe put this stuff in abstract contract? would be better for testing
-    function insertIntoList(int96 newRate, address newSender, address right) public { // TODO: private/internal
+    // assumes that sender already exists in the list
+    function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
+        SenderInfoListNode storage node = senderInfo[sender];
+        address left = node.left;
+        
+        if (right == node.right) {
+            if (left != address(0) && newRate <= senderInfo[node.left].flowRate) revert PosTooHigh();
+            if (right != address(0) && newRate >= senderInfo[right].flowRate) revert PosTooLow();
+
+            node.flowRate = newRate;
+        }
+        else {
+            _removeSenderInfoListNode(sender);
+            _insertSenderInfoListNode(newRate, sender, right);
+        }
+    }
+
+    // assumes that sender exists in the list
+    function _removeSenderInfoListNode(address sender) internal {
+        SenderInfoListNode storage center = senderInfo[sender];
+
+        if (center.left != address(0)) {
+            senderInfo[center.left].right = center.right;
+        }
+        
+        if (center.right != address(0)) {
+            senderInfo[center.right].left = center.left;
+        }
+        else {
+            // this is topStreamer
+            require(sender == topStreamer, "TODO REMOVE DEBUG 1");
+            topStreamer = center.left;
+        }
+
+        center.left = address(0);
+        center.right = address(0);
+    }
+
+    // TODO: maybe put this stuff in abstract contract? would be better for testing OR just make it internal, derive a test contract from this one
+    // newRate cannot be equal to any other incoming stream. must be strictly less than right and strictly more than left
+    // assumes that newSender is not already in the list
+    function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
         address left;
         if (right == address(0)) {
             left = topStreamer;
@@ -95,24 +154,24 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
             topStreamer = newSender;
         }
         else {
-            left = linkedListNodes[right].left;
+            left = senderInfo[right].left;
         }
 
         if (right != address(0)) {
             // make sure inFlowRate is less than rightFlowRate
-            if (newRate >= linkedListNodes[right].flowRate) revert PosTooLow();
+            if (newRate >= senderInfo[right].flowRate) revert PosTooLow();
 
-            linkedListNodes[right].left = newSender;
+            senderInfo[right].left = newSender;
         }
 
         if (left != address(0)) {
             // make sure inFlowRate is greater than rightFlowRate
-            if (newRate <= linkedListNodes[left].flowRate) revert PosTooHigh();
+            if (newRate <= senderInfo[left].flowRate) revert PosTooHigh();
 
-            linkedListNodes[left].right = newSender;
+            senderInfo[left].right = newSender;
         }
 
-        LinkedListNode storage newNode = linkedListNodes[newSender];
+        SenderInfoListNode storage newNode = senderInfo[newSender];
         newNode.left = left;
         newNode.right = right;
         newNode.sender = newSender;
@@ -145,23 +204,23 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
 
         address rightAddress = abi.decode(decompiledContext.userData, (address));
         
-        insertIntoList(inFlowRate, streamSender, rightAddress);
+        // _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
         
 
 
         
         // if (rightAddress == address(0)) {
-        //     if (inFlowRate <= linkedListNodes[topStreamer].flowRate) revert Unknown(); // incorrect position, new flow rate is less than the one to the left
+        //     if (inFlowRate <= senderInfo[topStreamer].flowRate) revert Unknown(); // incorrect position, new flow rate is less than the one to the left
 
         //     // this is indeed the new winner
 
         //     // we need to redirect old winner back to itself
             
         //     // insert at the end of linked list
-        //     linkedListNodes[topStreamer].right = streamSender;
+        //     senderInfo[topStreamer].right = streamSender;
 
-        //     LinkedListNode memory lln = linkedListNodes[streamSender];
+        //     LinkedListNode memory lln = senderInfo[streamSender];
         //     lln.left = topStreamer;
         //     lln.right = address(0);
         //     lln.sender = streamSender;
@@ -169,7 +228,7 @@ contract RentalAuction is SuperAppBase { // TODO: ownable (2 step)
         // }
         // else {
 
-        //     if (inFlowRate >= linkedListNodes[rightAddress].flowRate) revert Unknown(); // not correct position, new flow rate is higher than the one to the right
+        //     if (inFlowRate >= senderInfo[rightAddress].flowRate) revert Unknown(); // not correct position, new flow rate is higher than the one to the right
 
         //     address leftAddress = linke
         // }
