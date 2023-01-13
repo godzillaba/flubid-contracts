@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
+import "forge-std/Test.sol";
+
+
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
 import { ISuperfluid, ISuperToken, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
@@ -26,6 +29,8 @@ error Unknown();
 
 TODO:
 
+rename ethereum-contracts gitmodule
+
 constructor arg for IRentalAuctionControllerObserver (or IRentalAuctionEventHandler, IRentalAuctionHooks, IRentalAuctionController). A contract that gets called when a new winner is assigned (and can also cancel the auction)
     must be erc165 
 supportsInterface
@@ -35,19 +40,15 @@ a func on RentalAuction called something like closeAuction().
     It is used to stop the auction and redirect any streams back to senders. 
     now revert on afterAgreementCreated
 
+    also have kickSender() - for giving senders time limits or rejecting them for whatever other reason
+
 */
 
 contract RentalAuction is SuperAppBase {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
-    
-    ISuperToken public immutable acceptedToken;
-    ISuperfluid public immutable host;
-    IConstantFlowAgreementV1 public immutable cfa;
 
-    address public receiver;
-
-    /// @dev Linked list node for storing senders and their flow rates in ascending order
+    /// @dev Doubly linked list node for storing senders and their flow rates in ascending order
     /// @dev left is the node/sender to the left, right is right
     /// @dev if left = address(0), then it is the first item in the list
     /// @dev similarly, if right = address(0), then it is the last item in the list
@@ -59,30 +60,39 @@ contract RentalAuction is SuperAppBase {
         address sender;
         int96 flowRate;
     }
+    
+    ISuperToken public immutable acceptedToken;
+    ISuperfluid public immutable host;
+    IConstantFlowAgreementV1 public immutable cfa;
+
+    address public immutable beneficiary;
 
     /// @dev mapping containing linked list of senders' flow rates in ascending order
     mapping(address => SenderInfoListNode) public senderInfo;
 
-    // TODO: mapping address to bytes (bytes is a user defined message passed when creating/updating a stream)
-
-    /// @dev The sender of the stream with the highest flowrate. When 0 there are now incoming streams
+    /// @dev The sender of the stream with the highest flowrate. Marks right of linked list. When 0 there are now incoming streams
     address public topStreamer;
+
+    /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
+    mapping(address => bytes) public senderUserData;
+
+    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate); // TODO: think more about indexed
+    event NewInboundStream(address indexed streamer, int96 flowRate); // TODO: think more about indexed
 
     constructor(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
-        address _receiver
+        address _beneficiary
     ) {
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
-        require(_receiver != address(0));
+        require(_beneficiary != address(0));
 
         acceptedToken = _acceptedToken;
-        receiver = _receiver;
+        beneficiary = _beneficiary;
         host = _host;
         cfa = _cfa;
-
 
         // Registers Super App, indicating it is the final level (it cannot stream to other super
         // apps), and that the `before*` callbacks should not be called on this contract, only the
@@ -120,9 +130,8 @@ contract RentalAuction is SuperAppBase {
         onlyHost
         returns (bytes memory newCtx)
     {
-        // insert into linked list
-        // update winner and previous winner streams
-        // if position in linked list is missing or incorrect, revert
+        // it is not possible that stream sender already has a stream to this app
+        
         newCtx = _ctx;
 
         ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
@@ -130,36 +139,40 @@ contract RentalAuction is SuperAppBase {
         address streamSender = decompiledContext.msgSender;
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
-        address rightAddress = abi.decode(decompiledContext.userData, (address));
+        (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
         
-        // _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
+        address oldTopStreamer = topStreamer;
 
-        
+        _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
+        senderUserData[streamSender] = userData;
 
-        
-        // if (rightAddress == address(0)) {
-        //     if (inFlowRate <= senderInfo[topStreamer].flowRate) revert Unknown(); // incorrect position, new flow rate is less than the one to the left
+        if (rightAddress == address(0)) {
+            // this is the new top streamer
 
-        //     // this is indeed the new winner
+            if (oldTopStreamer == address(0)) {
+                // this is the first stream
+                // create flow to beneficiary
+                newCtx = acceptedToken.createFlowWithCtx(beneficiary, inFlowRate, newCtx);
+            }
+            else {
+                // update flow rate to beneficiary
+                newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
+                // create stream to old top streamer
+                newCtx = acceptedToken.createFlowWithCtx(oldTopStreamer, senderInfo[oldTopStreamer].flowRate, newCtx);
+            }
 
-        //     // we need to redirect old winner back to itself
-            
-        //     // insert at the end of linked list
-        //     senderInfo[topStreamer].right = streamSender;
+            // emit Event
+            emit NewTopStreamer(oldTopStreamer, streamSender, inFlowRate);
+        }
+        else {
+            // this is not the top streamer
 
-        //     LinkedListNode memory lln = senderInfo[streamSender];
-        //     lln.left = topStreamer;
-        //     lln.right = address(0);
-        //     lln.sender = streamSender;
-        //     lln.flowRate = inFlowRate;
-        // }
-        // else {
+            // send a stream of equal rate back to sender
+            newCtx = acceptedToken.createFlowWithCtx(streamSender, inFlowRate, newCtx);
+        }
 
-        //     if (inFlowRate >= senderInfo[rightAddress].flowRate) revert Unknown(); // not correct position, new flow rate is higher than the one to the right
-
-        //     address leftAddress = linke
-        // }
+        emit NewInboundStream(streamSender, inFlowRate);
     }
 
     function afterAgreementUpdated(
@@ -209,6 +222,7 @@ contract RentalAuction is SuperAppBase {
      *******************************************************/
 
     // assumes that sender already exists in the list
+    // TODO: newRate -> _newRate
     function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
         SenderInfoListNode storage node = senderInfo[sender];
         address left = node.left;

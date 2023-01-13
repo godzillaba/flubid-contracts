@@ -53,6 +53,9 @@ contract RentalAuctionTest is Test {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
+    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate); // TODO: think more about indexed
+    event NewInboundStream(address indexed streamer, int96 flowRate);
+
     TestToken dai;
     ISuperToken daix;
 
@@ -64,22 +67,24 @@ contract RentalAuctionTest is Test {
 
     address beneficiary = vm.addr(102);
 
+    uint256 totalSupply = 1_000_000 ether;
+
     function setUp() public {
         SuperfluidFrameworkDeployer sfDeployer = new SuperfluidFrameworkDeployer();
         sf = sfDeployer.getFramework();
     
         (dai, daix) = sfDeployer.deployWrapperSuperToken(
-            "Fake DAI", "DAI", 18, 100 ether
+            "Fake DAI", "DAI", 18, totalSupply
         );
 
         vm.startPrank(bank);
-        dai.mint(bank, 100 ether);
-        dai.approve(address(daix), 100 ether);
-        daix.upgrade(100 ether);
+        dai.mint(bank, totalSupply);
+        dai.approve(address(daix), totalSupply);
+        daix.upgrade(totalSupply);
         vm.stopPrank();
 
         require(dai.balanceOf(bank) == 0);
-        require(daix.balanceOf(bank) == 100 ether);
+        require(daix.balanceOf(bank) == totalSupply);
 
 
         app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, beneficiary);
@@ -100,6 +105,183 @@ contract RentalAuctionTest is Test {
 
         vm.stopPrank();
     }
+
+    function testFirstStream(int96 flowRate) public {
+        vm.assume(flowRate < 0.01 ether && flowRate > 0);
+        vm.assume(daix.getBufferAmountByFlowRate(flowRate) < 50 ether);
+
+        address sender = vm.addr(1);
+        bytes memory userData = bytes("user-data-1");
+
+        vm.prank(bank);
+        daix.transfer(sender, 100 ether);
+
+        vm.startPrank(sender);
+        
+        vm.expectEmit(true, true, false, true);
+        emit NewTopStreamer(address(0), sender, flowRate);
+
+        vm.expectEmit(true, false, false, true);
+        emit NewInboundStream(sender, flowRate);
+        
+        daix.createFlow(address(app), flowRate, abi.encode(address(0), userData));
+        
+        vm.stopPrank();
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, flowRate);
+        
+        // top streamer flow
+        assertEq(netFlowSender, -flowRate);
+
+        // user data
+        assertEq(app.senderUserData(sender), userData);
+
+        // assume list is proper
+    }
+
+    function testSecondStreamLarger(int96 firstRate, int96 secondRate) public {
+        vm.assume(firstRate != secondRate);
+        vm.assume(firstRate < 0.01 ether && firstRate > 0);
+        vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
+        vm.assume(secondRate < 0.01 ether && secondRate > 0);
+        vm.assume(daix.getBufferAmountByFlowRate(secondRate) < 50 ether);
+
+        if (firstRate > secondRate) {
+            int96 tmp = firstRate;
+            firstRate = secondRate;
+            secondRate = tmp;
+        }
+
+        testFirstStream(firstRate);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory userData1 = bytes("user-data-1");
+        bytes memory userData2 = bytes("user-data-2");
+
+        vm.prank(bank);
+        daix.transfer(sender2, 100 ether);
+
+        vm.expectEmit(true, true, false, true);
+        emit NewTopStreamer(sender1, sender2, secondRate);
+
+        vm.expectEmit(true, false, false, true);
+        emit NewInboundStream(sender2, secondRate);
+        
+        vm.prank(sender2);
+        daix.createFlow(address(app), secondRate, abi.encode(address(0), userData2));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, secondRate);
+        
+        // top streamer flow
+        assertEq(netFlowSender2, -secondRate);
+
+        // losing streamer flow
+        assertEq(netFlowSender1, 0);
+
+        // user data
+        assertEq(app.senderUserData(sender1), userData1);
+        assertEq(app.senderUserData(sender2), userData2);
+
+        // assume list is proper
+    }
+
+    function testSecondStreamSmaller(int96 firstRate, int96 secondRate) public {
+        vm.assume(firstRate != secondRate);
+        vm.assume(firstRate < 0.01 ether && firstRate > 0);
+        vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
+        vm.assume(secondRate < 0.01 ether && secondRate > 0);
+        vm.assume(daix.getBufferAmountByFlowRate(secondRate) < 50 ether);
+
+        if (secondRate > firstRate) {
+            int96 tmp = firstRate;
+            firstRate = secondRate;
+            secondRate = tmp;
+        }
+
+        testFirstStream(firstRate);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory userData1 = bytes("user-data-1");
+        bytes memory userData2 = bytes("user-data-2");
+
+        vm.prank(bank);
+        daix.transfer(sender2, 100 ether);
+
+        vm.expectEmit(true, false, false, true);
+        emit NewInboundStream(sender2, secondRate);
+        
+        vm.prank(sender2);
+        daix.createFlow(address(app), secondRate, abi.encode(sender1, userData2));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, firstRate);
+        
+        // top streamer flow
+        assertEq(netFlowSender1, -firstRate);
+
+        // losing streamer flow
+        assertEq(netFlowSender2, 0);
+
+        // user data
+        assertEq(app.senderUserData(sender1), userData1);
+        assertEq(app.senderUserData(sender2), userData2);
+
+        // assume list is proper
+    }
+
+
+    // todo: should NOT emit NewTopStreamer inappropriately
+    // todo: test access control including superfluid callbacks
+
+    /*******************************************************
+     * 
+     * Linked List Operations
+     * 
+     *******************************************************/
 
     function assertLinkedListNode(address id, address left, address right, int96 flowRate) private view {
         (address _left, address _right, address _id, int96 _flowRate) = app.senderInfo(id);
@@ -239,6 +421,7 @@ contract RentalAuctionTest is Test {
         assertLinkedListNode(address(50), address(60), address(0), 65);
         assertLinkedListNode(address(55), address(0), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(50), 60);
+        require(app.topStreamer() == address(50));
     }
 
     function testSuccessfulUpperToLowerUpdate() public {
@@ -248,6 +431,7 @@ contract RentalAuctionTest is Test {
         assertLinkedListNode(address(50), address(60), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(0), 55);
         assertLinkedListNode(address(60), address(0), address(50), 1);
+        require(app.topStreamer() == address(55));
     }
 
     function testBadInPlaceUpdate() public {
