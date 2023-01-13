@@ -76,8 +76,9 @@ contract RentalAuction is SuperAppBase {
     /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
     mapping(address => bytes) public senderUserData;
 
-    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate); // TODO: think more about indexed
-    event NewInboundStream(address indexed streamer, int96 flowRate); // TODO: think more about indexed
+    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate);
+    event NewInboundStream(address indexed streamer, int96 flowRate);
+    event StreamUpdated(address indexed streamer, int96 flowRate);
 
     constructor(
         ISuperToken _acceptedToken,
@@ -131,7 +132,7 @@ contract RentalAuction is SuperAppBase {
         returns (bytes memory newCtx)
     {
         // it is not possible that stream sender already has a stream to this app
-        
+
         newCtx = _ctx;
 
         ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
@@ -189,11 +190,56 @@ contract RentalAuction is SuperAppBase {
         onlyHost
         returns (bytes memory newCtx)
     {
-        // remove from linked list
-        // insert into linked list
-        // update winner and previous winner streams
-        // if position in linked list is missing or incorrect, revert
+        // it is not possible that stream sender does not already has a stream to this app
+
         newCtx = _ctx;
+
+        ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
+        
+        address streamSender = decompiledContext.msgSender;
+        int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
+
+        (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
+        
+        address oldTopStreamer = topStreamer;
+
+        _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
+
+        senderUserData[streamSender] = userData;
+
+        /*
+        There are 3 scenarios:
+        non top -> non top
+            updateFlow to sender with new rate
+        top -> non top
+            createFlow to old top
+            deleteFlow to new top
+            updateFlow to beneficiary with new top flow
+        non top -> top
+            createFlow to old top
+            deleteFlow to new top
+            updateFlow to beneficiary with new top flow
+        */
+        
+        if (oldTopStreamer != topStreamer) {
+            // create flow to old top
+            newCtx = acceptedToken.createFlowWithCtx(oldTopStreamer, senderInfo[oldTopStreamer].flowRate, newCtx);
+
+            // delete flow to new top
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), topStreamer, newCtx);
+
+            // update flow to beneficiary
+            int96 newTopRate = senderInfo[topStreamer].flowRate;
+            newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
+
+            emit NewTopStreamer(oldTopStreamer, topStreamer, newTopRate);
+        }
+        else {
+            // update flow to sender
+            newCtx = acceptedToken.updateFlowWithCtx(streamSender, inFlowRate, newCtx);
+        }
+
+        emit StreamUpdated(streamSender, inFlowRate);
     }
 
     function afterAgreementTerminated(
@@ -269,21 +315,22 @@ contract RentalAuction is SuperAppBase {
             topStreamer = newSender;
         }
         else {
-            left = senderInfo[right].left;
-        }
+            SenderInfoListNode storage rightNode = senderInfo[right];
 
-        if (right != address(0)) {
+            left = rightNode.left;
+
             // make sure inFlowRate is less than rightFlowRate
-            if (newRate >= senderInfo[right].flowRate) revert PosTooLow();
+            if (newRate >= rightNode.flowRate) revert PosTooLow();
 
-            senderInfo[right].left = newSender;
+            rightNode.left = newSender;
         }
 
         if (left != address(0)) {
+            SenderInfoListNode storage leftNode = senderInfo[left];
             // make sure inFlowRate is greater than rightFlowRate
-            if (newRate <= senderInfo[left].flowRate) revert PosTooHigh();
+            if (newRate <= leftNode.flowRate) revert PosTooHigh();
 
-            senderInfo[left].right = newSender;
+            leftNode.right = newSender;
         }
 
         SenderInfoListNode storage newNode = senderInfo[newSender];
