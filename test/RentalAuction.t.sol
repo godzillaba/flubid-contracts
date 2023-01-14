@@ -53,8 +53,10 @@ contract RentalAuctionTest is Test {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
-    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate); // TODO: think more about indexed
+    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
+    event StreamUpdated(address indexed streamer, int96 flowRate);
+
 
     TestToken dai;
     ISuperToken daix;
@@ -118,8 +120,8 @@ contract RentalAuctionTest is Test {
 
         vm.startPrank(sender);
         
-        vm.expectEmit(true, true, false, true);
-        emit NewTopStreamer(address(0), sender, flowRate);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(address(0), sender);
 
         vm.expectEmit(true, false, false, true);
         emit NewInboundStream(sender, flowRate);
@@ -177,7 +179,7 @@ contract RentalAuctionTest is Test {
         daix.transfer(sender2, 100 ether);
 
         vm.expectEmit(true, true, false, true);
-        emit NewTopStreamer(sender1, sender2, secondRate);
+        emit NewTopStreamer(sender1, sender2);
 
         vm.expectEmit(true, false, false, true);
         emit NewInboundStream(sender2, secondRate);
@@ -269,6 +271,139 @@ contract RentalAuctionTest is Test {
         // user data
         assertEq(app.senderUserData(sender1), userData1);
         assertEq(app.senderUserData(sender2), userData2);
+
+        // assume list is proper
+    }
+
+    // test updating a stream that is not the top, nor becomes the top
+    function testUpdateStreamLowLow() public {
+        testSecondStreamLarger(100, 200);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory newData = "new-data";
+
+        vm.prank(sender1);
+        vm.expectEmit(true, false, false, true);
+        emit StreamUpdated(sender1, 150);
+        daix.updateFlow(address(app), 150, abi.encode(sender2, newData));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 200);
+        
+        // top streamer flow
+        assertEq(netFlowSender2, -200);
+
+        // losing streamer flow
+        assertEq(netFlowSender1, 0);
+
+        // user data
+        assertEq(app.senderUserData(sender1), "new-data");
+        assertEq(app.senderUserData(sender2), "user-data-2");
+
+        // assume list is proper
+    }
+
+    // test updating a stream that is not the top, but becomes the top
+    function testUpdateStreamLowHigh() public {
+        testSecondStreamLarger(100, 200);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory newData = "new-data";
+
+        vm.prank(sender1);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender2, sender1);
+        vm.expectEmit(true, false, false, true);
+        emit StreamUpdated(sender1, 250);
+        daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 250);
+        
+        // top streamer flow
+        assertEq(netFlowSender1, -250);
+
+        // losing streamer flow
+        assertEq(netFlowSender2, 0);
+
+        // user data
+        assertEq(app.senderUserData(sender1), "new-data");
+        assertEq(app.senderUserData(sender2), "user-data-2");
+
+        // assume list is proper
+    }
+
+    // test updating a stream that is top, but moves down the list
+    function testUpdateStreamHighLow() public {
+        testSecondStreamLarger(100, 200);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory newData = "new-data";
+
+        vm.prank(sender2);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender2, sender1);
+        vm.expectEmit(true, false, false, true);
+        emit StreamUpdated(sender2, 50);
+        daix.updateFlow(address(app), 50, abi.encode(address(sender1), newData));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 100);
+        
+        // top streamer flow
+        assertEq(netFlowSender1, -100);
+
+        // losing streamer flow
+        assertEq(netFlowSender2, 0);
+
+        // user data
+        assertEq(app.senderUserData(sender1), "user-data-1");
+        assertEq(app.senderUserData(sender2), "new-data");
 
         // assume list is proper
     }

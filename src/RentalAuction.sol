@@ -76,7 +76,7 @@ contract RentalAuction is SuperAppBase {
     /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
     mapping(address => bytes) public senderUserData;
 
-    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer, int96 flowRate);
+    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
 
@@ -164,7 +164,7 @@ contract RentalAuction is SuperAppBase {
             }
 
             // emit Event
-            emit NewTopStreamer(oldTopStreamer, streamSender, inFlowRate);
+            emit NewTopStreamer(oldTopStreamer, streamSender);
         }
         else {
             // this is not the top streamer
@@ -232,7 +232,7 @@ contract RentalAuction is SuperAppBase {
             int96 newTopRate = senderInfo[topStreamer].flowRate;
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
-            emit NewTopStreamer(oldTopStreamer, topStreamer, newTopRate);
+            emit NewTopStreamer(oldTopStreamer, topStreamer);
         }
         else {
             // update flow to sender
