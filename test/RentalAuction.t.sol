@@ -419,7 +419,7 @@ contract RentalAuctionTest is Test {
      *******************************************************/
 
     function assertLinkedListNode(address id, address left, address right, int96 flowRate) private view {
-        (address _left, address _right, address _id, int96 _flowRate) = app.senderInfo(id);
+        (int96 _flowRate, address _left, address _right, address _id) = app.senderInfo(id);
         require(_id == id, "List node has incorrect sender");
         require(_left == left, "List node has incorrect left");
         require(_right == right, "List node has incorrect right");
@@ -485,6 +485,16 @@ contract RentalAuctionTest is Test {
         // test cannot be equal to the left
         vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
         app.insertSenderInfoListNode(55, address(124999137), address(60));
+    }
+
+    function testInsertionAndUpdateWithNonexistentRight() public {
+        testThirdInsertion();
+
+        vm.expectRevert(bytes4(keccak256("InvalidRight()")));
+        app.insertSenderInfoListNode(1000, vm.addr(1), vm.addr(2));
+
+        vm.expectRevert(bytes4(keccak256("InvalidRight()")));
+        app.insertSenderInfoListNode(1000, address(60), vm.addr(2));
     }
     
     function testSuccessfulLowerRemoval() public {

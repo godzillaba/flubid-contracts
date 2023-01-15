@@ -20,6 +20,8 @@ error InvalidAgreement();
 
 error PosTooHigh();
 error PosTooLow();
+
+error InvalidRight();
 // TODO replace this everywhere
 error Unknown();
 
@@ -42,6 +44,18 @@ a func on RentalAuction called something like closeAuction().
 
     also have kickSender() - for giving senders time limits or rejecting them for whatever other reason
 
+have a reserve rate, all streams must be >= this minumum
+
+
+make a new contract that has support for minimum rental times
+    new contract works more like a traditional auction. 
+    there is a period where people can bid (open stream + make deposit)
+    renter can back out, but if they do so prematurely, a portion of their deposit gets taken
+    renter (or owner) specifies the duration that they are guaranteed to rent the item for (unless they cancel)
+
+    no linked list in this one, you either outbid the top bidder or don't bid at all
+        when current top bidder is outbid, their deposit is returned to them
+
 */
 
 contract RentalAuction is SuperAppBase {
@@ -53,12 +67,13 @@ contract RentalAuction is SuperAppBase {
     /// @dev if left = address(0), then it is the first item in the list
     /// @dev similarly, if right = address(0), then it is the last item in the list
     /// @dev no two senders can have equal flowRate
+    /// @dev all items in the list have flowRate > 0. Any ListNodes with flowRate <= 0 are not in the list.
     struct SenderInfoListNode {
+        int96 flowRate;
         address left;
         address right;
 
         address sender;
-        int96 flowRate;
     }
     
     ISuperToken public immutable acceptedToken;
@@ -302,8 +317,13 @@ contract RentalAuction is SuperAppBase {
             topStreamer = center.left;
         }
 
-        center.left = address(0);
-        center.right = address(0);
+        assembly {
+            // center.flowRate = 0;
+            // center.left = address(0);
+            // center.right = address(0);
+            sstore(center.slot, 0)
+            sstore(add(center.slot, 1), 0)
+        }
     }
 
     // assumes that newSender is not already in the list
@@ -316,6 +336,8 @@ contract RentalAuction is SuperAppBase {
         }
         else {
             SenderInfoListNode storage rightNode = senderInfo[right];
+            
+            if (rightNode.flowRate == 0) revert InvalidRight();
 
             left = rightNode.left;
 
@@ -333,6 +355,8 @@ contract RentalAuction is SuperAppBase {
             leftNode.right = newSender;
         }
 
+
+        // TODO: assembly
         SenderInfoListNode storage newNode = senderInfo[newSender];
         newNode.left = left;
         newNode.right = right;
