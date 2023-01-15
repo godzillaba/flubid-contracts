@@ -56,6 +56,8 @@ contract RentalAuctionTest is Test {
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
+    event StreamTerminated(address indexed streamer);
+
 
 
     TestToken dai;
@@ -108,7 +110,7 @@ contract RentalAuctionTest is Test {
         vm.stopPrank();
     }
 
-    function testFirstStream(int96 flowRate) public {
+    function testCreateFirstStream(int96 flowRate) public {
         vm.assume(flowRate < 0.01 ether && flowRate > 0);
         vm.assume(daix.getBufferAmountByFlowRate(flowRate) < 50 ether);
 
@@ -154,7 +156,7 @@ contract RentalAuctionTest is Test {
         // assume list is proper
     }
 
-    function testSecondStreamLarger(int96 firstRate, int96 secondRate) public {
+    function testCreateSecondStreamLarger(int96 firstRate, int96 secondRate) public {
         vm.assume(firstRate != secondRate);
         vm.assume(firstRate < 0.01 ether && firstRate > 0);
         vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
@@ -167,7 +169,7 @@ contract RentalAuctionTest is Test {
             secondRate = tmp;
         }
 
-        testFirstStream(firstRate);
+        testCreateFirstStream(firstRate);
 
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
@@ -216,7 +218,7 @@ contract RentalAuctionTest is Test {
         // assume list is proper
     }
 
-    function testSecondStreamSmaller(int96 firstRate, int96 secondRate) public {
+    function testCreateSecondStreamSmaller(int96 firstRate, int96 secondRate) public {
         vm.assume(firstRate != secondRate);
         vm.assume(firstRate < 0.01 ether && firstRate > 0);
         vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
@@ -229,7 +231,7 @@ contract RentalAuctionTest is Test {
             secondRate = tmp;
         }
 
-        testFirstStream(firstRate);
+        testCreateFirstStream(firstRate);
 
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
@@ -277,7 +279,7 @@ contract RentalAuctionTest is Test {
 
     // test updating a stream that is not the top, nor becomes the top
     function testUpdateStreamLowLow() public {
-        testSecondStreamLarger(100, 200);
+        testCreateSecondStreamLarger(100, 200);
 
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
@@ -320,7 +322,7 @@ contract RentalAuctionTest is Test {
 
     // test updating a stream that is not the top, but becomes the top
     function testUpdateStreamLowHigh() public {
-        testSecondStreamLarger(100, 200);
+        testCreateSecondStreamLarger(100, 200);
 
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
@@ -365,7 +367,7 @@ contract RentalAuctionTest is Test {
 
     // test updating a stream that is top, but moves down the list
     function testUpdateStreamHighLow() public {
-        testSecondStreamLarger(100, 200);
+        testCreateSecondStreamLarger(100, 200);
 
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
@@ -404,6 +406,113 @@ contract RentalAuctionTest is Test {
         // user data
         assertEq(app.senderUserData(sender1), "user-data-1");
         assertEq(app.senderUserData(sender2), "new-data");
+
+        // assume list is proper
+    }
+
+    function testTerminateOnlyStream(int96 flowRate) public {
+        testCreateFirstStream(flowRate);
+
+        address sender = vm.addr(1);
+
+        vm.prank(sender);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender, address(0));
+        vm.expectEmit(true, false, false, false);
+        emit StreamTerminated(sender);
+        daix.deleteFlow(sender, address(app));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
+
+        // topStreamer
+        assertEq(app.topStreamer(), address(0));
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 0);
+
+        // deleted streamer flow
+        assertEq(netFlowSender, 0);
+
+        // assume list is proper
+    }
+
+    function testTerminateTopOfTwoStreams() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        vm.prank(sender2);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender2, sender1);
+        vm.expectEmit(true, false, false, false);
+        emit StreamTerminated(sender2);
+        daix.deleteFlow(sender2, address(app));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 100);
+
+        // deleted streamer flow
+        assertEq(netFlowSender2, 0);
+
+        // new top streamer flow
+        assertEq(netFlowSender1, -100);
+
+        // assume list is proper
+    }
+
+    function testTerminateBottomOfTwoStreams() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        vm.prank(sender1);
+        vm.expectEmit(true, false, false, false);
+        emit StreamTerminated(sender1);
+        daix.deleteFlow(sender1, address(app));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 200);
+
+        // deleted streamer flow
+        assertEq(netFlowSender1, 0);
+
+        // top streamer flow
+        assertEq(netFlowSender2, -200);
 
         // assume list is proper
     }

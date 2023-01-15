@@ -94,6 +94,7 @@ contract RentalAuction is SuperAppBase {
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
+    event StreamTerminated(address indexed streamer);
 
     constructor(
         ISuperToken _acceptedToken,
@@ -270,10 +271,44 @@ contract RentalAuction is SuperAppBase {
             return _ctx;
         }
 
-        // remove from linked list
-        // update winner and previous winner streams
-        // CANNOT REVERT HERE
         newCtx = _ctx;
+
+        address streamSender = host.decodeCtx(newCtx).msgSender;
+
+        address oldTopStreamer = topStreamer;
+
+        // remove from linked list
+        _removeSenderInfoListNode(streamSender);
+
+        address newTopStreamer = topStreamer;
+
+        if (newTopStreamer == address(0)) {
+            // deleted stream was the top and there are now no incoming streams
+
+            // delete beneficiary stream
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
+
+            emit NewTopStreamer(oldTopStreamer, newTopStreamer);
+        }
+        else if (oldTopStreamer != newTopStreamer) {
+            // deleted stream was the top and a new top has been chosen
+            
+            // remove return stream to new top
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), newTopStreamer, newCtx);
+
+            // update beneficiary stream
+            newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopStreamer].flowRate, newCtx);
+
+            emit NewTopStreamer(oldTopStreamer, newTopStreamer);
+        }
+        else {
+            // deleted stream was not the top
+            // delete return stream
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), streamSender, newCtx);
+        }
+
+
+        emit StreamTerminated(streamSender);
     }
 
     /*******************************************************
