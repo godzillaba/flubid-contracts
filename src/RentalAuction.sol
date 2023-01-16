@@ -18,8 +18,8 @@ error InvalidToken();
 /// @dev Thrown when the agreement is other than the Constant Flow Agreement V1
 error InvalidAgreement();
 
-error PosTooHigh();
-error PosTooLow();
+error FlowRateTooLow();
+error FlowRateTooHigh();
 
 error InvalidRight();
 // TODO replace this everywhere
@@ -45,6 +45,8 @@ a func on RentalAuction called something like closeAuction().
     also have kickSender() - for giving senders time limits or rejecting them for whatever other reason
 
 have a reserve rate, all streams must be >= this minumum
+
+make a description field (link to ipfs)
 
 
 make a new contract that has support for minimum rental times
@@ -82,6 +84,9 @@ contract RentalAuction is SuperAppBase {
 
     address public immutable beneficiary;
 
+    uint256 public immutable minimumBidFactorWad;
+    uint256 constant _wad = 1e18;
+
     /// @dev mapping containing linked list of senders' flow rates in ascending order
     mapping(address => SenderInfoListNode) public senderInfo;
 
@@ -100,16 +105,22 @@ contract RentalAuction is SuperAppBase {
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
-        address _beneficiary
+        address _beneficiary,
+        uint96 _minimumBidFactorWad
     ) {
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
+        require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow
+
         acceptedToken = _acceptedToken;
-        beneficiary = _beneficiary;
+        
         host = _host;
         cfa = _cfa;
+
+        beneficiary = _beneficiary;
+        minimumBidFactorWad = _minimumBidFactorWad;
 
         // Registers Super App, indicating it is the final level (it cannot stream to other super
         // apps), and that the `before*` callbacks should not be called on this contract, only the
@@ -317,6 +328,10 @@ contract RentalAuction is SuperAppBase {
      * 
      *******************************************************/
 
+    function _isBidHigher(int96 upper, int96 lower) private view returns (bool) {
+        return uint256(uint96(upper)) >= uint256(uint96(lower)) * minimumBidFactorWad / _wad;
+    }
+
     // assumes that sender already exists in the list
     // TODO: newRate -> _newRate
     function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
@@ -324,8 +339,8 @@ contract RentalAuction is SuperAppBase {
         address left = node.left;
         
         if (right == node.right) {
-            if (left != address(0) && newRate <= senderInfo[node.left].flowRate) revert PosTooHigh();
-            if (right != address(0) && newRate >= senderInfo[right].flowRate) revert PosTooLow();
+            if (left != address(0) && !_isBidHigher(newRate, senderInfo[node.left].flowRate)) revert FlowRateTooLow();
+            if (right != address(0) && newRate >= senderInfo[node.right].flowRate) revert FlowRateTooHigh();
 
             node.flowRate = newRate;
         }
@@ -376,16 +391,16 @@ contract RentalAuction is SuperAppBase {
 
             left = rightNode.left;
 
-            // make sure inFlowRate is less than rightFlowRate
-            if (newRate >= rightNode.flowRate) revert PosTooLow();
+            // make sure right flowRight is greater than inFlowRate
+            if (newRate >= rightNode.flowRate) revert FlowRateTooHigh();
 
             rightNode.left = newSender;
         }
 
         if (left != address(0)) {
             SenderInfoListNode storage leftNode = senderInfo[left];
-            // make sure inFlowRate is greater than rightFlowRate
-            if (newRate <= leftNode.flowRate) revert PosTooHigh();
+            // make sure inFlowRate is greater than leftFlowRate times minBidFactor
+            if (!_isBidHigher(newRate, leftNode.flowRate)) revert FlowRateTooLow();
 
             leftNode.right = newSender;
         }

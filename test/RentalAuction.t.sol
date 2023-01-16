@@ -31,9 +31,10 @@ contract RentalAuctionWithTestFunctions is RentalAuction {
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
-        address _receiver
+        address _receiver,
+        uint96 _minimumBidFactorWad
     )
-    RentalAuction(_acceptedToken, _host, _cfa, _receiver) {}
+    RentalAuction(_acceptedToken, _host, _cfa, _receiver, _minimumBidFactorWad) {}
 
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -73,6 +74,8 @@ contract RentalAuctionTest is Test {
 
     uint256 totalSupply = 1_000_000 ether;
 
+    uint96 constant minimumBidFactorWad = 1e18 / 20 + 1e18; // 1.05
+
     function setUp() public {
         SuperfluidFrameworkDeployer sfDeployer = new SuperfluidFrameworkDeployer();
         sf = sfDeployer.getFramework();
@@ -91,7 +94,7 @@ contract RentalAuctionTest is Test {
         require(daix.balanceOf(bank) == totalSupply);
 
 
-        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, beneficiary);
+        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, beneficiary, minimumBidFactorWad);
     }
 
     function testNoDuplicateStreams() public {
@@ -517,6 +520,12 @@ contract RentalAuctionTest is Test {
         // assume list is proper
     }
 
+    function testKickSender(int96 flowRate) public {
+        testCreateFirstStream(flowRate);
+
+        app.kickSender(vm.addr(1));
+    }
+
 
     // todo: should NOT emit NewTopStreamer inappropriately
     // todo: test access control including superfluid callbacks
@@ -547,11 +556,11 @@ contract RentalAuctionTest is Test {
         testFirstInsertion();
 
         // insert second one with position too high
-        vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
         app.insertSenderInfoListNode(40, address(40), address(0));
 
         // insert second one with position too low
-        vm.expectRevert(bytes4(keccak256("PosTooLow()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
         app.insertSenderInfoListNode(60, address(60), address(50));
         
         // insert second one successfully (to the right)
@@ -565,15 +574,15 @@ contract RentalAuctionTest is Test {
         testSecondInsertion(); // -> 50 - 60
 
         // insert third one with position too high
-        vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
         app.insertSenderInfoListNode(55, address(55), address(0));
-        vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
         app.insertSenderInfoListNode(45, address(45), address(60));
 
         // insert third one with position too low
-        vm.expectRevert(bytes4(keccak256("PosTooLow()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
         app.insertSenderInfoListNode(65, address(65), address(60));
-        vm.expectRevert(bytes4(keccak256("PosTooLow()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
         app.insertSenderInfoListNode(55, address(55), address(50));
         
         // insert third one successfully (in the middle) = 50 - 55 - 60
@@ -584,16 +593,42 @@ contract RentalAuctionTest is Test {
         require(app.topStreamer() == address(60));
     }
 
-    function testInsertionFlowRateCannotBeEqual() public {
+    function testInsertionFlowRateMustBeFarEnoughFromNeighbors() public {
         testThirdInsertion(); // 50 - 55 - 60
 
-        // test cannot be equal to the right
-        vm.expectRevert(bytes4(keccak256("PosTooLow()")));
+        // cannot be equal to the right
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
         app.insertSenderInfoListNode(60, address(91240), address(60));
         
-        // test cannot be equal to the left
-        vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
+        // cannot be equal to the left
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
         app.insertSenderInfoListNode(55, address(124999137), address(60));
+
+        // cannot be too close to the left
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
+        app.insertSenderInfoListNode(56, address(124999137), address(60));
+
+        // can be close to the right
+        app.insertSenderInfoListNode(59, address(124999137), address(60));
+    }
+
+    function testUpdateFlowRateMustBeFarEnoughFromNeighbors() public {
+        testThirdInsertion(); // 50 - 55 - 60
+
+        // cannot be equal to the right
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
+        app.updateSenderInfoListNode(60, address(55), address(60));
+        
+        // cannot be equal to the left
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
+        app.updateSenderInfoListNode(50, address(55), address(60));
+
+        // cannot be too close to the left
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
+        app.updateSenderInfoListNode(51, address(55), address(60));
+
+        // can be close to the right
+        app.updateSenderInfoListNode(59, address(55), address(60));
     }
 
     function testInsertionAndUpdateWithNonexistentRight() public {
@@ -692,11 +727,11 @@ contract RentalAuctionTest is Test {
         testThirdInsertion();
 
         // should fail b/c rate is equal to left
-        vm.expectRevert(bytes4(keccak256("PosTooHigh()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
         app.updateSenderInfoListNode(5, address(55), address(60));
 
         // should fail b/c rate is equal to left
-        vm.expectRevert(bytes4(keccak256("PosTooLow()")));
+        vm.expectRevert(bytes4(keccak256("FlowRateTooHigh()")));
         app.updateSenderInfoListNode(60, address(55), address(60));
     }
 }
