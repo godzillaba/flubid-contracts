@@ -77,6 +77,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     uint96 constant minimumBidFactorWad = 1e18 / 20 + 1e18; // 1.05
 
+    address reportedWinner;
+
+    address constant reportedWinnerPlaceholder = address(type(uint160).max);
+
     function setUp() public {
         SuperfluidFrameworkDeployer sfDeployer = new SuperfluidFrameworkDeployer();
         sf = sfDeployer.getFramework();
@@ -99,7 +103,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     function onWinnerChanged(address newWinner) public {
-        
+        reportedWinner = newWinner;
     }
 
     function testNoDuplicateStreams() public {
@@ -122,6 +126,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.assume(flowRate < 0.01 ether && flowRate > 0);
         vm.assume(daix.getBufferAmountByFlowRate(flowRate) < 50 ether);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender = vm.addr(1);
         bytes memory userData = bytes("user-data-1");
 
@@ -139,6 +145,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         daix.createFlow(address(app), flowRate, abi.encode(address(0), userData));
         
         vm.stopPrank();
+
+        //// make sure onWinnerChanged callback was called appropriately
+
+        assertEq(reportedWinner, sender);
 
         //// check state
 
@@ -171,11 +181,15 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.assume(secondRate < 0.01 ether && secondRate > 0);
         vm.assume(daix.getBufferAmountByFlowRate(secondRate) < 50 ether);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         if (firstRate > secondRate) {
             int96 tmp = firstRate;
             firstRate = secondRate;
             secondRate = tmp;
         }
+
+        vm.assume(app.isBidHigher(secondRate, firstRate));
 
         testCreateFirstStream(firstRate);
 
@@ -196,6 +210,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         
         vm.prank(sender2);
         daix.createFlow(address(app), secondRate, abi.encode(address(0), userData2));
+
+        //// make sure onWinnerChanged callback was called appropriately
+
+        assertEq(reportedWinner, sender2);
 
         //// check state
 
@@ -241,6 +259,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         testCreateFirstStream(firstRate);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -255,6 +275,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         
         vm.prank(sender2);
         daix.createFlow(address(app), secondRate, abi.encode(sender1, userData2));
+
+        //// make sure onWinnerChanged callback was NOT called
+
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
 
         //// check state
 
@@ -289,6 +313,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testUpdateStreamLowLow() public {
         testCreateSecondStreamLarger(100, 200);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -298,6 +324,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender1, 150);
         daix.updateFlow(address(app), 150, abi.encode(sender2, newData));
+
+        //// make sure onWinnerChanged callback was NOT called
+
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
 
         //// check state
 
@@ -332,6 +362,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testUpdateStreamLowHigh() public {
         testCreateSecondStreamLarger(100, 200);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -343,6 +375,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender1, 250);
         daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
+
+        //// make sure onWinnerChanged callback was called
+
+        assertEq(reportedWinner, sender1);
 
         //// check state
 
@@ -377,6 +413,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testUpdateStreamHighLow() public {
         testCreateSecondStreamLarger(100, 200);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -388,6 +426,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender2, 50);
         daix.updateFlow(address(app), 50, abi.encode(address(sender1), newData));
+
+        //// make sure onWinnerChanged callback was called
+
+        assertEq(reportedWinner, sender1);
 
         //// check state
 
@@ -421,6 +463,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testTerminateOnlyStream(int96 flowRate) public {
         testCreateFirstStream(flowRate);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender = vm.addr(1);
 
         vm.prank(sender);
@@ -429,6 +473,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, false);
         emit StreamTerminated(sender);
         daix.deleteFlow(sender, address(app));
+
+        //// make sure onWinnerChanged callback was called
+
+        assertEq(reportedWinner, address(0));
 
         //// check state
 
@@ -457,12 +505,18 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         vm.prank(sender2);
         vm.expectEmit(true, true, false, false);
         emit NewTopStreamer(sender2, sender1);
         vm.expectEmit(true, false, false, false);
         emit StreamTerminated(sender2);
         daix.deleteFlow(sender2, address(app));
+
+        //// make sure onWinnerChanged callback was called appropriately
+
+        assertEq(reportedWinner, sender1);
 
         //// check state
 
@@ -492,6 +546,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testTerminateBottomOfTwoStreams() public {
         testCreateSecondStreamLarger(100, 200);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -499,6 +555,10 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, false);
         emit StreamTerminated(sender1);
         daix.deleteFlow(sender1, address(app));
+
+        //// make sure onWinnerChanged callback was NOT called
+
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
 
         //// check state
 

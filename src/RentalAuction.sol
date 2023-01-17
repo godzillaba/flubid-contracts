@@ -368,7 +368,7 @@ contract RentalAuction is SuperAppBase {
 
     /*******************************************************
      * 
-     * RentalAuctionControllerObserver functions (TODO: access control)
+     * RentalAuctionControllerObserver functions
      * 
      *******************************************************/
 
@@ -405,7 +405,7 @@ contract RentalAuction is SuperAppBase {
      * 
      *******************************************************/
 
-    function _isBidHigher(int96 upper, int96 lower) private view returns (bool) {
+    function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
         return uint256(uint96(upper)) >= uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
@@ -416,7 +416,7 @@ contract RentalAuction is SuperAppBase {
         address left = node.left;
         
         if (right == node.right) {
-            if (left != address(0) && !_isBidHigher(newRate, senderInfo[node.left].flowRate)) revert FlowRateTooLow();
+            if (left != address(0) && !isBidHigher(newRate, senderInfo[node.left].flowRate)) revert FlowRateTooLow();
             if (right != address(0) && newRate >= senderInfo[node.right].flowRate) revert FlowRateTooHigh();
 
             node.flowRate = newRate;
@@ -477,7 +477,7 @@ contract RentalAuction is SuperAppBase {
         if (left != address(0)) {
             SenderInfoListNode storage leftNode = senderInfo[left];
             // make sure inFlowRate is greater than leftFlowRate times minBidFactor
-            if (!_isBidHigher(newRate, leftNode.flowRate)) revert FlowRateTooLow();
+            if (!isBidHigher(newRate, leftNode.flowRate)) revert FlowRateTooLow();
 
             leftNode.right = newSender;
         }
