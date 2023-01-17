@@ -24,17 +24,18 @@ import {
 
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
 
-import { RentalAuction } from "../src/RentalAuction.sol";
+import { RentalAuction, IRentalAuctionControllerObserver } from "../src/RentalAuction.sol";
 
 contract RentalAuctionWithTestFunctions is RentalAuction {
     constructor(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
+        IRentalAuctionControllerObserver _controllerObserver,
         address _receiver,
         uint96 _minimumBidFactorWad
     )
-    RentalAuction(_acceptedToken, _host, _cfa, _receiver, _minimumBidFactorWad) {}
+    RentalAuction(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad) {}
 
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -50,7 +51,7 @@ contract RentalAuctionWithTestFunctions is RentalAuction {
 
 }
 
-contract RentalAuctionTest is Test {
+contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
@@ -94,7 +95,11 @@ contract RentalAuctionTest is Test {
         require(daix.balanceOf(bank) == totalSupply);
 
 
-        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, beneficiary, minimumBidFactorWad);
+        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad);
+    }
+
+    function onWinnerChanged(address newWinner) public {
+        
     }
 
     function testNoDuplicateStreams() public {
@@ -519,13 +524,6 @@ contract RentalAuctionTest is Test {
 
         // assume list is proper
     }
-
-    function testKickSender(int96 flowRate) public {
-        testCreateFirstStream(flowRate);
-
-        app.kickSender(vm.addr(1));
-    }
-
 
     // todo: should NOT emit NewTopStreamer inappropriately
     // todo: test access control including superfluid callbacks

@@ -22,6 +22,10 @@ error FlowRateTooLow();
 error FlowRateTooHigh();
 
 error InvalidRight();
+
+error Paused();
+error NotPaused();
+
 // TODO replace this everywhere
 error Unknown();
 
@@ -60,6 +64,10 @@ make a new contract that has support for minimum rental times
 
 */
 
+interface IRentalAuctionControllerObserver {
+    function onWinnerChanged(address newWinner) external;
+}
+
 contract RentalAuction is SuperAppBase {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
@@ -82,6 +90,8 @@ contract RentalAuction is SuperAppBase {
     ISuperfluid public immutable host;
     IConstantFlowAgreementV1 public immutable cfa;
 
+    IRentalAuctionControllerObserver public immutable controllerObserver;
+
     address public immutable beneficiary;
 
     uint256 public immutable minimumBidFactorWad;
@@ -96,6 +106,8 @@ contract RentalAuction is SuperAppBase {
     /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
     mapping(address => bytes) public senderUserData;
 
+    bool public paused;
+
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
@@ -105,6 +117,7 @@ contract RentalAuction is SuperAppBase {
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
+        IRentalAuctionControllerObserver _controllerObserver,
         address _beneficiary,
         uint96 _minimumBidFactorWad
     ) {
@@ -118,6 +131,8 @@ contract RentalAuction is SuperAppBase {
         
         host = _host;
         cfa = _cfa;
+
+        controllerObserver = _controllerObserver;
 
         beneficiary = _beneficiary;
         minimumBidFactorWad = _minimumBidFactorWad;
@@ -144,6 +159,21 @@ contract RentalAuction is SuperAppBase {
         _;
     }
 
+    modifier onlyController() {
+        if (msg.sender != address(controllerObserver)) revert Unauthorized();
+        _;
+    }
+
+    modifier whenNotPaused() {
+        if (paused) revert Paused();
+        _;
+    }
+
+    modifier whenPaused() {
+        if (!paused) revert NotPaused();
+        _;
+    }
+
     function afterAgreementCreated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -156,6 +186,7 @@ contract RentalAuction is SuperAppBase {
         override
         onlyExpected(_superToken, _agreementClass)
         onlyHost
+        whenNotPaused
         returns (bytes memory newCtx)
     {
         // it is not possible that stream sender already has a stream to this app
@@ -190,6 +221,9 @@ contract RentalAuction is SuperAppBase {
                 newCtx = acceptedToken.createFlowWithCtx(oldTopStreamer, senderInfo[oldTopStreamer].flowRate, newCtx);
             }
 
+            // notify controller
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(streamSender);
+
             // emit Event
             emit NewTopStreamer(oldTopStreamer, streamSender);
         }
@@ -215,6 +249,7 @@ contract RentalAuction is SuperAppBase {
         override
         onlyExpected(_superToken, _agreementClass)
         onlyHost
+        whenNotPaused
         returns (bytes memory newCtx)
     {
         // it is not possible that stream sender does not already has a stream to this app
@@ -259,6 +294,9 @@ contract RentalAuction is SuperAppBase {
             int96 newTopRate = senderInfo[topStreamer].flowRate;
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
+            // notify controller
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(topStreamer);
+
             emit NewTopStreamer(oldTopStreamer, topStreamer);
         }
         else {
@@ -299,7 +337,10 @@ contract RentalAuction is SuperAppBase {
             // delete beneficiary stream
             newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
-            emit NewTopStreamer(oldTopStreamer, newTopStreamer);
+            // notify controller
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
+
+            emit NewTopStreamer(oldTopStreamer, address(0));
         }
         else if (oldTopStreamer != newTopStreamer) {
             // deleted stream was the top and a new top has been chosen
@@ -309,6 +350,9 @@ contract RentalAuction is SuperAppBase {
 
             // update beneficiary stream
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopStreamer].flowRate, newCtx);
+
+            // notify controller
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(newTopStreamer);
 
             emit NewTopStreamer(oldTopStreamer, newTopStreamer);
         }
@@ -322,6 +366,39 @@ contract RentalAuction is SuperAppBase {
         emit StreamTerminated(streamSender);
     }
 
+    /*******************************************************
+     * 
+     * RentalAuctionControllerObserver functions (TODO: access control)
+     * 
+     *******************************************************/
+
+    function pause() external whenNotPaused onlyController {
+        paused = true;
+        address _topStreamer = topStreamer;
+
+        if (_topStreamer != address(0)) {
+            // delete beneficiary stream
+            acceptedToken.deleteFlow(address(this), beneficiary);
+
+            // we need to send a return stream to the top streamer
+            acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
+        }
+    }
+
+    function unpause() external whenPaused onlyController {
+        paused = false;
+
+        address _topStreamer = topStreamer;
+
+        if (_topStreamer != address(0)) {
+            // we need to send a return stream to the top streamer
+            acceptedToken.deleteFlow(address(this), _topStreamer);
+
+            // we need to create flow to beneficiary
+            acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
+        }
+    }
+    
     /*******************************************************
      * 
      * Linked List Operations
