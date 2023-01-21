@@ -585,8 +585,174 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // assume list is proper
     }
 
-    // todo: should NOT emit NewTopStreamer inappropriately
-    // todo: test access control including superfluid callbacks
+    /*******************************************************
+     * 
+     * Controller Operations
+     * 
+     *******************************************************/
+
+    function testPausingAccessControl() public {
+        vm.prank(vm.addr(1));
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        app.pause();
+
+        vm.prank(vm.addr(1));
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        app.unpause();
+    }
+
+    function testPause() public {
+        testCreateSecondStreamLarger(100, 200);
+        app.pause();
+
+        //// check state
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 0);
+
+        assertEq(netFlowSender1, 0);
+        assertEq(netFlowSender2, 0);
+    }
+
+    function testFailCreateStreamWhenPaused() public {
+        // creating or updating a stream should revert when paused
+
+        app.pause();
+
+        address sender = vm.addr(1);
+        bytes memory userData = bytes("user-data-1");
+
+        vm.prank(bank);
+        daix.transfer(sender, 100 ether);
+
+        vm.prank(sender);
+        // vm.expectRevert(bytes4(keccak256("Paused()"))); // for some reason this doesn't work
+        daix.createFlow(address(app), 10, abi.encode(address(0), userData));
+    }
+
+    function testUpdateStreamWhenPaused() public {
+        // creating or updating a stream should revert when paused
+
+        testCreateFirstStream(100);
+
+        app.pause();
+
+        address sender = vm.addr(1);
+        bytes memory userData = bytes("user-data-1");
+
+        vm.prank(sender);
+        vm.expectRevert(bytes4(keccak256("Paused()")));
+        daix.updateFlow(address(app), 10, abi.encode(address(0), userData));
+    }
+
+    function testTerminateLowerStreamWhenPaused() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        app.pause();
+
+        address sender = vm.addr(1);
+
+        vm.prank(sender);
+        daix.deleteFlow(sender, address(app));
+
+        //// check state
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 0);
+
+        assertEq(netFlowSender1, 0);
+        assertEq(netFlowSender2, 0);
+    }
+
+    function testTerminateTopStreamWhenPaused() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        app.pause();
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        vm.prank(sender2);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender2, sender1);
+        daix.deleteFlow(sender2, address(app));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 0);
+
+        assertEq(netFlowSender1, 0);
+        assertEq(netFlowSender2, 0);
+    }
+
+    function testTerminateOnlyStreamWhenPaused() public {
+        testCreateFirstStream(100);
+        app.pause();
+
+        address sender = vm.addr(1);
+
+        vm.prank(sender);
+        vm.expectEmit(true, true, false, false);
+        emit NewTopStreamer(sender, address(0));
+        daix.deleteFlow(sender, address(app));
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
+
+        // topStreamer
+        assertEq(app.topStreamer(), address(0));
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 0);
+
+        assertEq(netFlowSender, 0);
+    }
 
     /*******************************************************
      * 

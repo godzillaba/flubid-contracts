@@ -334,25 +334,39 @@ contract RentalAuction is SuperAppBase {
         if (newTopStreamer == address(0)) {
             // deleted stream was the top and there are now no incoming streams
 
-            // delete beneficiary stream
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
+            if (paused) {
+                // if we're paused then there is no beneficiary stream
+                // we have to delete return stream
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldTopStreamer, newCtx);
+            }
+            else {
+                // delete beneficiary stream
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
-            // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
+                // notify controller
+                if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
+            }
 
             emit NewTopStreamer(oldTopStreamer, address(0));
         }
         else if (oldTopStreamer != newTopStreamer) {
             // deleted stream was the top and a new top has been chosen
-            
-            // remove return stream to new top
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), newTopStreamer, newCtx);
 
-            // update beneficiary stream
-            newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopStreamer].flowRate, newCtx);
+            if (paused) {
+                // if we're paused then there is no beneficiary stream
+                // we have to delete return stream
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldTopStreamer, newCtx);
+            }
+            else {
+                // remove return stream to new top
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), newTopStreamer, newCtx);
 
-            // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(newTopStreamer);
+                // update beneficiary stream
+                newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopStreamer].flowRate, newCtx);
+
+                // notify controller
+                if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(newTopStreamer);
+            }
 
             emit NewTopStreamer(oldTopStreamer, newTopStreamer);
         }
@@ -372,7 +386,7 @@ contract RentalAuction is SuperAppBase {
      * 
      *******************************************************/
 
-    function pause() external whenNotPaused onlyController {
+    function pause() external onlyController whenNotPaused {
         paused = true;
         address _topStreamer = topStreamer;
 
@@ -385,7 +399,7 @@ contract RentalAuction is SuperAppBase {
         }
     }
 
-    function unpause() external whenPaused onlyController {
+    function unpause() external onlyController whenPaused {
         paused = false;
 
         address _topStreamer = topStreamer;
