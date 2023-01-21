@@ -108,6 +108,8 @@ contract RentalAuction is SuperAppBase {
 
     bool public paused;
 
+    int96 public reserveRate;
+
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
@@ -119,13 +121,15 @@ contract RentalAuction is SuperAppBase {
         IConstantFlowAgreementV1 _cfa,
         IRentalAuctionControllerObserver _controllerObserver,
         address _beneficiary,
-        uint96 _minimumBidFactorWad
+        uint96 _minimumBidFactorWad,
+        int96 _reserveRate
     ) {
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
         require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow
+        require(_reserveRate >= 0);
 
         acceptedToken = _acceptedToken;
         
@@ -136,6 +140,7 @@ contract RentalAuction is SuperAppBase {
 
         beneficiary = _beneficiary;
         minimumBidFactorWad = _minimumBidFactorWad;
+        reserveRate = _reserveRate;
 
         // Registers Super App, indicating it is the final level (it cannot stream to other super
         // apps), and that the `before*` callbacks should not be called on this contract, only the
@@ -197,6 +202,8 @@ contract RentalAuction is SuperAppBase {
         
         address streamSender = decompiledContext.msgSender;
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
+
+        if (inFlowRate < reserveRate) revert FlowRateTooLow();
 
         (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
         
@@ -260,6 +267,8 @@ contract RentalAuction is SuperAppBase {
         
         address streamSender = decompiledContext.msgSender;
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
+
+        if (inFlowRate < reserveRate) revert FlowRateTooLow();
 
         (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
         

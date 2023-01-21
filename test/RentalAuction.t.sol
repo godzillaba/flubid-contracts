@@ -33,9 +33,10 @@ contract RentalAuctionWithTestFunctions is RentalAuction {
         IConstantFlowAgreementV1 _cfa,
         IRentalAuctionControllerObserver _controllerObserver,
         address _receiver,
-        uint96 _minimumBidFactorWad
+        uint96 _minimumBidFactorWad,
+        int96 _reserveRate
     )
-    RentalAuction(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad) {}
+    RentalAuction(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad, _reserveRate) {}
 
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -77,6 +78,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     uint96 constant minimumBidFactorWad = 1e18 / 20 + 1e18; // 1.05
 
+    int96 reserveRate = 5;
+
     address reportedWinner;
 
     address constant reportedWinnerPlaceholder = address(type(uint160).max);
@@ -99,7 +102,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         require(daix.balanceOf(bank) == totalSupply);
 
 
-        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad);
+        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
     }
 
     function onWinnerChanged(address newWinner) public {
@@ -122,8 +125,29 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.stopPrank();
     }
 
+    function testFailCreateStreamMustBeAtLeastReserveRate() public {
+        address sender = vm.addr(1);
+
+        vm.prank(bank);
+        daix.transfer(sender, 100 ether);
+
+        vm.prank(sender);
+        // vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
+        daix.createFlow(address(app), reserveRate - 1, abi.encode(address(0), bytes("")));
+    }
+
+    function testUpdateStreamMustBeAtLeastReserveRate() public {
+        address sender = vm.addr(1);
+
+        testCreateFirstStream(reserveRate);
+
+        vm.prank(sender);
+        vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
+        daix.updateFlow(address(app), reserveRate - 1, abi.encode(address(0), bytes("hi")));
+    }
+
     function testCreateFirstStream(int96 flowRate) public {
-        vm.assume(flowRate < 0.01 ether && flowRate > 0);
+        vm.assume(flowRate < 0.01 ether && flowRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(flowRate) < 50 ether);
 
         reportedWinner = reportedWinnerPlaceholder;
@@ -176,9 +200,9 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     function testCreateSecondStreamLarger(int96 firstRate, int96 secondRate) public {
         vm.assume(firstRate != secondRate);
-        vm.assume(firstRate < 0.01 ether && firstRate > 0);
+        vm.assume(firstRate < 0.01 ether && firstRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
-        vm.assume(secondRate < 0.01 ether && secondRate > 0);
+        vm.assume(secondRate < 0.01 ether && secondRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(secondRate) < 50 ether);
 
         reportedWinner = reportedWinnerPlaceholder;
@@ -246,9 +270,9 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     function testCreateSecondStreamSmaller(int96 firstRate, int96 secondRate) public {
         vm.assume(firstRate != secondRate);
-        vm.assume(firstRate < 0.01 ether && firstRate > 0);
+        vm.assume(firstRate < 0.01 ether && firstRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(firstRate) < 50 ether);
-        vm.assume(secondRate < 0.01 ether && secondRate > 0);
+        vm.assume(secondRate < 0.01 ether && secondRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(secondRate) < 50 ether);
 
         if (secondRate > firstRate) {
