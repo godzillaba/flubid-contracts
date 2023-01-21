@@ -108,7 +108,7 @@ contract RentalAuction is SuperAppBase {
 
     bool public paused;
 
-    int96 public reserveRate;
+    int96 public immutable reserveRate;
 
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
