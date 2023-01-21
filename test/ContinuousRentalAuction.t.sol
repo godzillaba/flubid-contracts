@@ -24,9 +24,10 @@ import {
 
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
 
-import { RentalAuction, IRentalAuctionControllerObserver } from "../src/RentalAuction.sol";
+import { ContinuousRentalAuction } from "../src/ContinuousRentalAuction.sol";
+import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 
-contract RentalAuctionWithTestFunctions is RentalAuction {
+contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
     constructor(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
@@ -35,8 +36,9 @@ contract RentalAuctionWithTestFunctions is RentalAuction {
         address _receiver,
         uint96 _minimumBidFactorWad,
         int96 _reserveRate
-    )
-    RentalAuction(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad, _reserveRate) {}
+    ) {
+        super.initialize(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad, _reserveRate);
+    }
 
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -68,7 +70,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     SuperfluidFrameworkDeployer.Framework sf;
 
-    RentalAuctionWithTestFunctions app;
+    ContinuousRentalAuctionWithTestFunctions app;
 
     address bank = vm.addr(101);
 
@@ -102,12 +104,14 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         require(daix.balanceOf(bank) == totalSupply);
 
 
-        app = new RentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
+        app = new ContinuousRentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
     }
 
     function onWinnerChanged(address newWinner) public {
         reportedWinner = newWinner;
     }
+
+    function initialize(address, bytes calldata) external {}
 
     function testNoDuplicateStreams() public {
         address sender = vm.addr(1);
@@ -777,6 +781,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         assertEq(netFlowSender, 0);
     }
+
+    // TODO: test unpause when there are some streams
 
     /*******************************************************
      * 

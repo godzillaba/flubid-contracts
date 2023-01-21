@@ -1,34 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
+import "forge-std/Test.sol"; // TODO: REMOVE
 
 
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
-import { ISuperfluid, ISuperToken, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
+import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 
-/// @dev Thrown when the callback caller is not the host.
-error Unauthorized();
-
-/// @dev Thrown when the token being streamed to this contract is invalid
-error InvalidToken();
-
-/// @dev Thrown when the agreement is other than the Constant Flow Agreement V1
-error InvalidAgreement();
-
-error FlowRateTooLow();
-error FlowRateTooHigh();
-
-error InvalidRight();
-
-error Paused();
-error NotPaused();
-
-// TODO replace this everywhere
-error Unknown();
-
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 
 /*
@@ -64,11 +47,7 @@ make a new contract that has support for minimum rental times
 
 */
 
-interface IRentalAuctionControllerObserver {
-    function onWinnerChanged(address newWinner) external;
-}
-
-contract RentalAuction is SuperAppBase {
+contract ContinuousRentalAuction is SuperAppBase, Initializable {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
@@ -86,15 +65,15 @@ contract RentalAuction is SuperAppBase {
         address sender;
     }
     
-    ISuperToken public immutable acceptedToken;
-    ISuperfluid public immutable host;
-    IConstantFlowAgreementV1 public immutable cfa;
+    ISuperToken public acceptedToken;
+    ISuperfluid public host;
+    IConstantFlowAgreementV1 public cfa;
 
-    IRentalAuctionControllerObserver public immutable controllerObserver;
+    IRentalAuctionControllerObserver public controllerObserver;
 
-    address public immutable beneficiary;
+    address public beneficiary;
 
-    uint256 public immutable minimumBidFactorWad;
+    uint256 public minimumBidFactorWad;
     uint256 constant _wad = 1e18;
 
     /// @dev mapping containing linked list of senders' flow rates in ascending order
@@ -108,14 +87,32 @@ contract RentalAuction is SuperAppBase {
 
     bool public paused;
 
-    int96 public immutable reserveRate;
+    int96 public reserveRate;
 
     event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);
 
-    constructor(
+    /// @dev Thrown when the callback caller is not the host.
+    error Unauthorized();
+
+    /// @dev Thrown when the token being streamed to this contract is invalid
+    error InvalidToken();
+
+    /// @dev Thrown when the agreement is other than the Constant Flow Agreement V1
+    error InvalidAgreement();
+
+    error FlowRateTooLow();
+    error FlowRateTooHigh();
+
+    error InvalidRight();
+
+    error Paused();
+    error NotPaused();
+
+
+    function initialize(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
         IConstantFlowAgreementV1 _cfa,
@@ -123,12 +120,13 @@ contract RentalAuction is SuperAppBase {
         address _beneficiary,
         uint96 _minimumBidFactorWad,
         int96 _reserveRate
-    ) {
+    ) public initializer {
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
         require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow
+        require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
         acceptedToken = _acceptedToken;
