@@ -26,6 +26,7 @@ import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperToke
 
 import { ContinuousRentalAuction } from "../src/ContinuousRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
+import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
 contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
@@ -107,7 +108,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         reportedWinner = newWinner;
     }
 
-    function initialize(address, bytes calldata) external {}
+    function initialize(IRentalAuction, bytes calldata) external {}
 
     function testNoDuplicateStreams() public {
         address sender = vm.addr(1);
@@ -779,6 +780,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     // TODO: test unpause when there are some streams
+    // TODO: make sure onWinnerChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
 
     /*******************************************************
      * 

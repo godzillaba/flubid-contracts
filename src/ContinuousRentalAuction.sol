@@ -9,10 +9,11 @@ import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperToke
 import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
-import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 
 import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
+import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
+import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 
 /*
 
@@ -47,7 +48,7 @@ make a new contract that has support for minimum rental times
 
 */
 
-contract ContinuousRentalAuction is SuperAppBase, Initializable {
+contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 

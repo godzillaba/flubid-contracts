@@ -9,6 +9,7 @@ import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
+import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 import { ContinuousRentalAuction } from "../ContinuousRentalAuction.sol";
 
 
@@ -57,7 +58,7 @@ contract ContinuousRentalAuctionFactory {
         );
 
         IRentalAuctionControllerObserver(controllerObserverClone).initialize(
-            auctionClone,
+            IRentalAuction(auctionClone),
             _controllerObserverExtraArgs
         );
 
