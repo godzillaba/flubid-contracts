@@ -120,12 +120,12 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable {
         address _beneficiary,
         uint96 _minimumBidFactorWad,
         int96 _reserveRate
-    ) public initializer {
+    ) external initializer {
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
-        require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow
+        require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow (TODO: why is this here it makes no sense)
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
@@ -139,16 +139,6 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable {
         beneficiary = _beneficiary;
         minimumBidFactorWad = _minimumBidFactorWad;
         reserveRate = _reserveRate;
-
-        // Registers Super App, indicating it is the final level (it cannot stream to other super
-        // apps), and that the `before*` callbacks should not be called on this contract, only the
-        // `after*` callbacks.
-        host.registerApp(
-            SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
-                SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
-                SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
-                SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP
-        );
     }
 
     modifier onlyHost() {

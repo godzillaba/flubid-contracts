@@ -3,7 +3,8 @@ pragma solidity ^0.8.13;
 
 import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
 
-import { ISuperfluid } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperApp.sol";
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
@@ -16,6 +17,11 @@ contract ContinuousRentalAuctionFactory {
 
     address immutable host;
     address immutable cfa;
+
+    uint256 constant configWord = SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
+        SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
+        SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
+        SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;
 
     event ContinuousRentalAuctionDeployed(address auctionAddress, address controllerObserverAddress);
     event RentalAuctionControllerObserverDeployed(address controllerObserverAddress, address auctionAddress);
@@ -37,6 +43,8 @@ contract ContinuousRentalAuctionFactory {
     ) external returns (address auctionClone, address controllerObserverClone) {
         auctionClone = Clones.clone(implementation);
         controllerObserverClone = Clones.clone(_controllerObserverImplementation);
+
+        ISuperfluid(host).registerAppByFactory(ISuperApp(auctionClone), configWord);
 
         ContinuousRentalAuction(auctionClone).initialize(
             _acceptedToken, 

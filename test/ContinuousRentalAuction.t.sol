@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Test.sol";
 
-import {ISuperfluid} from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import {ISuperfluid, SuperAppDefinitions} from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 
 import {ISuperToken} from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import {ISuperTokenFactory} from "superfluid-finance/contracts/interfaces/superfluid/ISuperTokenFactory.sol";
@@ -28,18 +28,6 @@ import { ContinuousRentalAuction } from "../src/ContinuousRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 
 contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
-    constructor(
-        ISuperToken _acceptedToken,
-        ISuperfluid _host,
-        IConstantFlowAgreementV1 _cfa,
-        IRentalAuctionControllerObserver _controllerObserver,
-        address _receiver,
-        uint96 _minimumBidFactorWad,
-        int96 _reserveRate
-    ) {
-        super.initialize(_acceptedToken, _host, _cfa, _controllerObserver, _receiver, _minimumBidFactorWad, _reserveRate);
-    }
-
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
     }
@@ -104,7 +92,15 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         require(daix.balanceOf(bank) == totalSupply);
 
 
-        app = new ContinuousRentalAuctionWithTestFunctions(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
+        app = new ContinuousRentalAuctionWithTestFunctions();
+
+        uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
+            SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
+            SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
+            SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;
+
+        ISuperfluid(sf.host).registerAppByFactory(app, configWord);
+        app.initialize(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
     }
 
     function onWinnerChanged(address newWinner) public {
