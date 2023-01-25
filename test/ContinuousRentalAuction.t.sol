@@ -43,7 +43,7 @@ contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
 
 }
 
-contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
+contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
@@ -181,8 +181,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
         (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender);
+        // currentWinner
+        assertEq(app.currentWinner(), sender);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -247,8 +247,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender2);
+        // currentWinner
+        assertEq(app.currentWinner(), sender2);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -312,8 +312,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender1);
+        // currentWinner
+        assertEq(app.currentWinner(), sender1);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -361,8 +361,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender2);
+        // currentWinner
+        assertEq(app.currentWinner(), sender2);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -412,8 +412,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender1);
+        // currentWinner
+        assertEq(app.currentWinner(), sender1);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -463,8 +463,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender1);
+        // currentWinner
+        assertEq(app.currentWinner(), sender1);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -509,8 +509,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
         (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
 
-        // topStreamer
-        assertEq(app.topStreamer(), address(0));
+        // currentWinner
+        assertEq(app.currentWinner(), address(0));
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -550,8 +550,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender1);
+        // currentWinner
+        assertEq(app.currentWinner(), sender1);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -592,8 +592,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender2);
+        // currentWinner
+        assertEq(app.currentWinner(), sender2);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -640,8 +640,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender2);
+        // currentWinner
+        assertEq(app.currentWinner(), sender2);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -704,8 +704,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender2);
+        // currentWinner
+        assertEq(app.currentWinner(), sender2);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -737,8 +737,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
-        // topStreamer
-        assertEq(app.topStreamer(), sender1);
+        // currentWinner
+        assertEq(app.currentWinner(), sender1);
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -767,8 +767,8 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
         (,int96 netFlowSender,,) = daix.getNetFlowInfo(sender);
 
-        // topStreamer
-        assertEq(app.topStreamer(), address(0));
+        // currentWinner
+        assertEq(app.currentWinner(), address(0));
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -781,6 +781,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     // TODO: test unpause when there are some streams
     // TODO: make sure onWinnerChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
+    // TODO: test bidder in 2nd place has close to 0 daix when 1st place deletes their stream
 
     /*******************************************************
      * 
@@ -801,7 +802,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.insertSenderInfoListNode(50, address(50), address(0));
 
         assertLinkedListNode(address(50), address(0), address(0), 50);
-        require(app.topStreamer() == address(50));
+        require(app.currentWinner() == address(50));
     }
 
     function testSecondInsertion() public {
@@ -819,7 +820,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.insertSenderInfoListNode(60, address(60), address(0));
         assertLinkedListNode(address(60), address(50), address(0), 60);
         assertLinkedListNode(address(50), address(0), address(60), 50);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testThirdInsertion() public {
@@ -842,7 +843,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(0), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(0), 60);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testInsertionFlowRateMustBeFarEnoughFromNeighbors() public {
@@ -900,7 +901,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.removeSenderInfoListNode(address(50));
         assertLinkedListNode(address(55), address(0), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(0), 60);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testSuccessfulMiddleRemoval() public {
@@ -910,7 +911,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.removeSenderInfoListNode(address(55));
         assertLinkedListNode(address(50), address(0), address(60), 50);
         assertLinkedListNode(address(60), address(50), address(0), 60);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testSuccessfulUpperRemoval() public {
@@ -920,7 +921,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.removeSenderInfoListNode(address(60));
         assertLinkedListNode(address(50), address(0), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(0), 55);
-        require(app.topStreamer() == address(55));
+        require(app.currentWinner() == address(55));
     }
 
     // test update
@@ -932,7 +933,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(0), address(55), 45);
         assertLinkedListNode(address(55), address(50), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(0), 60);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testSuccessfulMiddleInPlaceUpdate() public {
@@ -942,7 +943,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(0), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(60), 54);
         assertLinkedListNode(address(60), address(55), address(0), 60);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testSuccessfulUpperInPlaceUpdate() public {
@@ -952,7 +953,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(0), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(0), 65);
-        require(app.topStreamer() == address(60));
+        require(app.currentWinner() == address(60));
     }
 
     function testSuccessfulLowerToUpperUpdate() public {
@@ -962,7 +963,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(60), address(0), 65);
         assertLinkedListNode(address(55), address(0), address(60), 55);
         assertLinkedListNode(address(60), address(55), address(50), 60);
-        require(app.topStreamer() == address(50));
+        require(app.currentWinner() == address(50));
     }
 
     function testSuccessfulUpperToLowerUpdate() public {
@@ -972,7 +973,7 @@ contract RentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertLinkedListNode(address(50), address(60), address(55), 50);
         assertLinkedListNode(address(55), address(50), address(0), 55);
         assertLinkedListNode(address(60), address(0), address(50), 1);
-        require(app.topStreamer() == address(55));
+        require(app.currentWinner() == address(55));
     }
 
     function testBadInPlaceUpdate() public {

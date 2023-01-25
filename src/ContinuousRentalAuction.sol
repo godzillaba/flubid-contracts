@@ -81,7 +81,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     mapping(address => SenderInfoListNode) public senderInfo;
 
     /// @dev The sender of the stream with the highest flowrate. Marks right of linked list. When 0 there are now incoming streams
-    address public topStreamer;
+    address public currentWinner;
 
     /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
     mapping(address => bytes) public senderUserData;
@@ -90,7 +90,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     int96 public reserveRate;
 
-    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
+    event NewTopStreamer(address indexed oldWinner, address indexed newTopStreamer);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);
@@ -196,7 +196,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
         
-        address oldTopStreamer = topStreamer;
+        address oldWinner = currentWinner;
 
         _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
@@ -205,7 +205,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         if (rightAddress == address(0)) {
             // this is the new top streamer
 
-            if (oldTopStreamer == address(0)) {
+            if (oldWinner == address(0)) {
                 // this is the first stream
                 // create flow to beneficiary
                 newCtx = acceptedToken.createFlowWithCtx(beneficiary, inFlowRate, newCtx);
@@ -214,14 +214,14 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 // update flow rate to beneficiary
                 newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
                 // create stream to old top streamer
-                newCtx = acceptedToken.createFlowWithCtx(oldTopStreamer, senderInfo[oldTopStreamer].flowRate, newCtx);
+                newCtx = acceptedToken.createFlowWithCtx(oldWinner, senderInfo[oldWinner].flowRate, newCtx);
             }
 
             // notify controller
             if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(streamSender);
 
             // emit Event
-            emit NewTopStreamer(oldTopStreamer, streamSender);
+            emit NewTopStreamer(oldWinner, streamSender);
         }
         else {
             // this is not the top streamer
@@ -261,7 +261,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
         
-        address oldTopStreamer = topStreamer;
+        address oldWinner = currentWinner;
 
         _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
@@ -281,21 +281,21 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             updateFlow to beneficiary with new top flow
         */
         
-        if (oldTopStreamer != topStreamer) {
+        if (oldWinner != currentWinner) {
             // create flow to old top
-            newCtx = acceptedToken.createFlowWithCtx(oldTopStreamer, senderInfo[oldTopStreamer].flowRate, newCtx);
+            newCtx = acceptedToken.createFlowWithCtx(oldWinner, senderInfo[oldWinner].flowRate, newCtx);
 
             // delete flow to new top
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), topStreamer, newCtx);
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), currentWinner, newCtx);
 
             // update flow to beneficiary
-            int96 newTopRate = senderInfo[topStreamer].flowRate;
+            int96 newTopRate = senderInfo[currentWinner].flowRate;
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
             // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(topStreamer);
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(currentWinner);
 
-            emit NewTopStreamer(oldTopStreamer, topStreamer);
+            emit NewTopStreamer(oldWinner, currentWinner);
         }
         else {
             // update flow to sender
@@ -322,12 +322,12 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         address streamSender = host.decodeCtx(newCtx).msgSender;
 
-        address oldTopStreamer = topStreamer;
+        address oldWinner = currentWinner;
 
         // remove from linked list
         _removeSenderInfoListNode(streamSender);
 
-        address newTopStreamer = topStreamer;
+        address newTopStreamer = currentWinner;
 
         if (newTopStreamer == address(0)) {
             // deleted stream was the top and there are now no incoming streams
@@ -335,7 +335,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             if (paused) {
                 // if we're paused then there is no beneficiary stream
                 // we have to delete return stream
-                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldTopStreamer, newCtx);
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldWinner, newCtx);
             }
             else {
                 // delete beneficiary stream
@@ -345,15 +345,15 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
             }
 
-            emit NewTopStreamer(oldTopStreamer, address(0));
+            emit NewTopStreamer(oldWinner, address(0));
         }
-        else if (oldTopStreamer != newTopStreamer) {
+        else if (oldWinner != newTopStreamer) {
             // deleted stream was the top and a new top has been chosen
 
             if (paused) {
                 // if we're paused then there is no beneficiary stream
                 // we have to delete return stream
-                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldTopStreamer, newCtx);
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), oldWinner, newCtx);
             }
             else {
                 // remove return stream to new top
@@ -366,7 +366,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(newTopStreamer);
             }
 
-            emit NewTopStreamer(oldTopStreamer, newTopStreamer);
+            emit NewTopStreamer(oldWinner, newTopStreamer);
         }
         else {
             // deleted stream was not the top
@@ -386,7 +386,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     function pause() external onlyController whenNotPaused {
         paused = true;
-        address _topStreamer = topStreamer;
+        address _topStreamer = currentWinner;
 
         if (_topStreamer != address(0)) {
             // delete beneficiary stream
@@ -400,7 +400,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     function unpause() external onlyController whenPaused {
         paused = false;
 
-        address _topStreamer = topStreamer;
+        address _topStreamer = currentWinner;
 
         if (_topStreamer != address(0)) {
             // we need to send a return stream to the top streamer
@@ -451,9 +451,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             senderInfo[center.right].left = center.left;
         }
         else {
-            // this is topStreamer
-            require(sender == topStreamer, "TODO REMOVE DEBUG 1");
-            topStreamer = center.left;
+            // this is currentWinner
+            require(sender == currentWinner, "TODO REMOVE DEBUG 1");
+            currentWinner = center.left;
         }
 
         assembly {
@@ -469,9 +469,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
         address left;
         if (right == address(0)) {
-            left = topStreamer;
+            left = currentWinner;
 
-            topStreamer = newSender;
+            currentWinner = newSender;
         }
         else {
             SenderInfoListNode storage rightNode = senderInfo[right];

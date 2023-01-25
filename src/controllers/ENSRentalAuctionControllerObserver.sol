@@ -73,7 +73,7 @@ contract ENSRentalAuctionControllerObserver is IRentalAuctionControllerObserver,
         rentalAuction.unpause();
 
         // set controller to current top bidder if it isn't 0x00
-        address topStreamer = rentalAuction.topStreamer();
+        address topStreamer = rentalAuction.currentWinner();
         if (topStreamer != address(0)) {
             _setENSNameController(topStreamer);
         }

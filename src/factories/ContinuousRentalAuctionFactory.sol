@@ -42,6 +42,8 @@ contract ContinuousRentalAuctionFactory {
         int96 _reserveRate,
         bytes calldata _controllerObserverExtraArgs
     ) external returns (address auctionClone, address controllerObserverClone) {
+        // TODO: make sure acceptedToken is actually a supertoken
+
         auctionClone = Clones.clone(implementation);
         controllerObserverClone = Clones.clone(_controllerObserverImplementation);
 
