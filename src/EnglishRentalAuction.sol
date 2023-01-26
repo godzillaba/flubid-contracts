@@ -442,20 +442,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         controllerObserver.onWinnerChanged(address(0));
     }
 
-    // function beforeAgreementCreated(
-    //     ISuperToken _superToken,
-    //     address _agreementClass,
-    //     bytes32 /*agreementId*/,
-    //     bytes calldata /*agreementData*/,
-    //     bytes calldata /*ctx*/
-    // )
-    //     external
-    //     view
-    //     virtual
-    //     override
-    //     onlyExpected(_superToken, _agreementClass)
-    //     returns (bytes memory /*cbdata*/) {}
-
     function afterAgreementCreated(
         ISuperToken /*superToken*/,
         address /*agreementClass*/,
@@ -487,40 +473,48 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     
 
     function afterAgreementTerminated(
-        ISuperToken _superToken,
-        address _agreementClass,
+        ISuperToken, //_superToken,
+        address, // _agreementClass,
         bytes32, // _agreementId,
         bytes calldata, // _agreementData
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
         console.log("afterAgreementTerminated");
-        // According to the app basic law, we should never revert in a termination callback
-        if (_superToken != acceptedToken || _agreementClass != address(cfa)) {
-            // TODO: this condition may be unnecessary because only this app can initiate streams to itself
-            return _ctx;
-        }
 
         newCtx = _ctx;
 
         address msgSender = host.decodeCtx(newCtx).msgSender;
 
         // if we are not in renting phase or msgSender is not currentWinner, then do nothing
-
         if (!isBiddingPhase && msgSender == currentWinner) {
             // the current renter has terminated their stream
-
-            // set state variables for beginning of bidding phase
-            isBiddingPhase = true;
             
+            // delete flow to beneficiary (not reentrant)
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
+
+            // return deposit (or part of it)
+            if (!depositClaimed) {
+                uint256 streamedAmount = uint96(topFlowRate) * (block.timestamp + maxRentalDuration - currentPhaseEndTime );
+                uint256 depositSize = uint96(topFlowRate) * minRentalDuration;
+
+                if (streamedAmount >= depositSize) {
+                    // not reentrant
+                    acceptedToken.transfer(msgSender, depositSize);
+                }
+                else {
+                    unchecked {
+                        acceptedToken.transfer(beneficiary, depositSize - streamedAmount);
+                    }
+                    acceptedToken.transfer(msgSender, streamedAmount);
+                }
+            }
+
+            // set state variables for beginning of bidding phase (TODO: easy to optimize a little bit, end time can be uint160 probs)
+            isBiddingPhase = true;
             currentPhaseEndTime = 0;
             topFlowRate = 0;
             depositClaimed = false;
-
-            // delete flow to beneficiary
-            acceptedToken.deleteFlow(address(this), beneficiary);
-
-            // TODO: return deposit (or part of it)
 
             controllerObserver.onWinnerChanged(address(0));
         }

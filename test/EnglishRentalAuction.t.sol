@@ -207,7 +207,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
     }
 
-    function testSuccessfullyTransitionToRentalPhase(int96 flowRate) public {
+    function testTransitionToRentalPhase(int96 flowRate) public {
         vm.assume(flowRate > 0);
         
         testSuccessfulBid(flowRate);
@@ -237,29 +237,10 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), flowRate);
     }
 
-    // function testFoo() public {
-    //     testSuccessfullyTransitionToRentalPhase(5);
-
-    //     vm.warp(block.timestamp + 1 hours);
-    //     address renter = vm.addr(1);
-
-    //     console.log(address(app), renter, address(sf.host), address(this));
-    //     vm.prank(renter);
-    //     sf.host.callAgreement(
-    //         sf.cfa,
-    //         abi.encodeCall(
-    //             sf.cfa.deleteFlow,
-    //             (daix, renter, address(app), new bytes(0))
-    //         ),
-    //         new bytes(0) // userData
-    //     );
-    //     // console.log(uint96(daix.getNetFlowRate(renter)));
-    // }
-    
-    function testSuccessfullyTransitionToBiddingPhase(int96 flowRate) public {
+    function testTransitionToBiddingPhase(int96 flowRate) public {
         vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
-        testSuccessfullyTransitionToRentalPhase(flowRate);
+        testTransitionToRentalPhase(flowRate);
 
         address renter = vm.addr(1);
 
@@ -283,6 +264,96 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.balanceOf(address(app)), 0);
         assertEq(daix.balanceOf(beneficiary), amountFlowed);
         assertEq(daix.balanceOf(renter), 1 ether - amountFlowed);
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(renter), 0);
+        assertEq(daix.getNetFlowRate(beneficiary), 0);
+    }
+
+    function testRenterTerminateStreamAfterMinimumDuration(int32 _flowRate, uint32 duration) public {
+        // renter terminates their stream before the maxRentalDuration has elapsed but after the minRentalDuration has elapsed
+        int96 flowRate = int96(_flowRate);
+
+        vm.assume(duration >= minRentalDuration && duration < maxRentalDuration * 3 / 2);
+        vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
+
+        testTransitionToRentalPhase(flowRate);
+
+        vm.warp(block.timestamp + duration);
+
+        address renter = vm.addr(1);
+
+        // renter terminates their flow
+        vm.prank(renter);
+        sf.host.callAgreement(
+            sf.cfa,
+            abi.encodeCall(
+                sf.cfa.deleteFlow,
+                (daix, renter, address(app), new bytes(0))
+            ),
+            new bytes(0) // userData
+        );
+
+        // verify app's state variables
+        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.topFlowRate(), 0);
+
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
+
+        assertEq(app.currentPhaseEndTime(), 0);
+
+        // verify daix balances
+        uint256 amountFlowed = uint96(flowRate) * duration;
+        assertEq(daix.balanceOf(address(app)), 0);
+        assertEq(daix.balanceOf(beneficiary), amountFlowed);
+        assertEq(daix.balanceOf(renter), 1 ether - amountFlowed);
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(renter), 0);
+        assertEq(daix.getNetFlowRate(beneficiary), 0);
+    }
+
+    function testRenterTerminateStreamBeforeMinimumDuration(int32 _flowRate, uint32 duration) public {
+        // renter terminates their stream before the minRentalDuration has elapsed
+        int96 flowRate = int96(int32(_flowRate));
+
+        vm.assume(duration < minRentalDuration);
+        vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
+
+        testTransitionToRentalPhase(flowRate);
+
+        vm.warp(block.timestamp + duration);
+
+        address renter = vm.addr(1);
+
+        // renter terminates their flow
+        vm.prank(renter);
+        sf.host.callAgreement(
+            sf.cfa,
+            abi.encodeCall(
+                sf.cfa.deleteFlow,
+                (daix, renter, address(app), new bytes(0))
+            ),
+            new bytes(0) // userData
+        );
+
+        // verify app's state variables
+        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.topFlowRate(), 0);
+
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
+
+        assertEq(app.currentPhaseEndTime(), 0);
+
+        // verify daix balances
+        uint256 depositSize = uint96(flowRate) * minRentalDuration;
+        assertEq(daix.balanceOf(address(app)), 0);
+        assertEq(daix.balanceOf(beneficiary), depositSize);
+        assertEq(daix.balanceOf(renter), 1 ether - depositSize);
 
         // verify streams
         assertEq(daix.getNetFlowRate(address(app)), 0);
