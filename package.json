@@ -5,6 +5,7 @@
   "author": "Henry <11198460+godzillaba@users.noreply.github.com>",
   "license": "MIT",
   "scripts": {
-    "test": "forge test --fork-url https://eth.llamarpc.com --fork-block-number 16377651"
+    "test": "forge test --fork-url https://eth.llamarpc.com --fork-block-number 16377651",
+    "coverage": "forge coverage --fork-url https://eth.llamarpc.com --fork-block-number 16377651 --report lcov"
   }
 }

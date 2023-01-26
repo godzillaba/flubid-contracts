@@ -418,7 +418,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
      *******************************************************/
 
     function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
-        return uint256(uint96(upper)) >= uint256(uint96(lower)) * minimumBidFactorWad / _wad;
+        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
     // assumes that sender already exists in the list

@@ -86,7 +86,11 @@ in the bidding phase:
 
 
 
+    TODOTODOTODOTODO
+        implement reclaiming deposit
+        implement pausing/unpausing
 
+        think hard about constructor parameters, what restrictions must be placed, what can go wrong?
 
 */
 
@@ -202,11 +206,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
-        require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow (TODO: why is this here it makes no sense)
+        require(_minimumBidFactorWad < uint256(type(uint160).max));
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
         require(_maxRentalDuration >= _minRentalDuration);
+
+        require(_biddingPhaseDuration >= _biddingPhaseExtensionDuration);
 
         // TODO: think more about minRentalDuration, it can't be too small. is 1 enough? if no, what is?
 
@@ -268,7 +274,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     }
 
     function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
-        return uint256(uint96(upper)) >= uint256(uint96(lower)) * minimumBidFactorWad / _wad;
+        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
     function _placeBid(address msgSender, int96 flowRate) private {
@@ -292,7 +298,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         else if (currentPhaseEndTime - block.timestamp < biddingPhaseExtensionDuration) {
             // this is not the first bid, but it is close to the end of the bidding period
             // we should extend the bidding phase
-            currentPhaseEndTime += biddingPhaseExtensionDuration;
+            currentPhaseEndTime = block.timestamp + biddingPhaseExtensionDuration;
         }
 
         // take deposit from new bidder
@@ -300,7 +306,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         acceptedToken.transferFrom(msgSender, address(this), depositSize);
 
         // return the deposit of the last bidder (if there is one)
-        if (oldCurrentWinner != address(0)) {
+        if (oldTopFlowRate != 0) {
             acceptedToken.transfer(oldCurrentWinner, uint96(oldTopFlowRate) * minRentalDuration);
         }
 
@@ -311,7 +317,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // sender should have approved this contract to spend acceptedToken and manage streams for them
     // will revert if it is not approved for ERC20 transfer
     // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.
-    // todo: maybe make another version of this function that doesn't need to get called by the host
     // todo: userData
     function placeBid(int96 flowRate, bytes calldata _ctx) external onlyHost whenBiddingPhase returns (bytes memory) {
         address msgSender = host.decodeCtx(_ctx).msgSender;
@@ -379,23 +384,24 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // try create flow from winner to app
         // it can fail if the winner has not approved the app as a flow operator
         // if it does fail, take their deposit and restart bidding phase
+        int96 _topFlowRate = topFlowRate;
         try host.callAgreement(
             cfa,
             abi.encodeCall(
                 cfa.createFlowByOperator,
-                (acceptedToken, currentWinner, address(this), topFlowRate, new bytes(0))
+                (acceptedToken, currentWinner, address(this), _topFlowRate, new bytes(0))
             ),
             new bytes(0)
         ) {
             // afterAgreementCreated is triggered, which does the state transition to the renting phase
         }
         catch {
-            // restart bidding phase
+            // send their deposit to beneficiary
+            acceptedToken.transfer(beneficiary, uint96(_topFlowRate) * minRentalDuration);
 
+            // restart bidding phase
             topFlowRate = 0;
             currentPhaseEndTime = 0;
-
-            // todo: send their deposit to beneficiary
         }
 
         // todo: explore how to pay the caller of this function (maybe with the deposit?)
@@ -412,13 +418,11 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // return deposit (not reentrant)
         if (!depositClaimed) {
             acceptedToken.transfer(currentWinner, uint96(topFlowRate) * minRentalDuration); 
-        } 
-        else {
-            depositClaimed = false;
         }
 
         // set state variables for beginning of bidding phase
         isBiddingPhase = true;
+        depositClaimed = false;
         
         currentPhaseEndTime = 0;
         topFlowRate = 0;
@@ -439,7 +443,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             // TODO: there is a function where anyone can send acceptedToken stuck in this contract to the beneficiary (be sure to account for legit deposits)
         }
 
-        controllerObserver.onWinnerChanged(address(0));
+        if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
     }
 
     function afterAgreementCreated(
@@ -466,7 +470,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         newCtx = acceptedToken.createFlowWithCtx(beneficiary, topFlowRate, _ctx);
 
-        controllerObserver.onWinnerChanged(currentWinner);
+        if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(currentWinner);
     }
 
 
@@ -516,7 +520,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             topFlowRate = 0;
             depositClaimed = false;
 
-            controllerObserver.onWinnerChanged(address(0));
+            if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
         }
     }
 

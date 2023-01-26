@@ -168,14 +168,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.placeBid(flowRate);
     }
 
-    function testSuccessfulBid(int96 flowRate) public {
-        vm.assume(flowRate >= reserveRate);
-        vm.assume(uint96(flowRate) * minRentalDuration < 0.5 ether);
-
-        address user = vm.addr(1);
-
+    function bid(address bidder, int96 flowRate) private {
         vm.prank(bank);
-        daix.transfer(user, 1 ether);
+        daix.transfer(bidder, 1 ether);
 
         ISuperfluid.Operation[] memory ops = new ISuperfluid.Operation[](3);
 
@@ -183,8 +178,17 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         ops[1] = createFlowOperatorAuthorizationOperation();
         ops[2] = createSuperAppCallOperation(abi.encodeWithSignature("placeBid(int96,bytes)", flowRate, bytes("")));
 
-        vm.prank(user);
+        vm.prank(bidder);
         sf.host.batchCall(ops);
+    }
+
+    function testSuccessfulBid(int96 flowRate) public {
+        vm.assume(flowRate >= reserveRate);
+        vm.assume(uint96(flowRate) * minRentalDuration < 0.5 ether);
+
+        address user = vm.addr(1);
+
+        bid(user, flowRate);
 
         // verify the app's state variables
 
@@ -206,13 +210,99 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(user), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
     }
+    
+    // TODO
+    // function testSecondBidTooLow(int32 flowRate1, int32 flowRate2) public {
+
+    // }
+
+    function testSecondBid(int32 flowRate1, int32 flowRate2) public {
+        vm.assume(flowRate1 >= reserveRate);
+        vm.assume(uint32(flowRate1) * minRentalDuration < 0.5 ether);
+        vm.assume(uint32(flowRate2) * minRentalDuration < 0.5 ether);
+        vm.assume(flowRate2 > 0 && app.isBidHigher(flowRate2, flowRate1));
+
+        address bidder1 = vm.addr(1);
+        address bidder2 = vm.addr(2);
+
+        uint256 firstBidTs = block.timestamp;
+
+        bid(bidder1, flowRate1);
+
+        vm.warp(firstBidTs + biddingPhaseDuration - biddingPhaseExtensionDuration);
+
+        bid(bidder2, flowRate2);
+
+        // verify the app's state variables
+
+        assertEq(app.currentWinner(), bidder2);
+        assertEq(app.topFlowRate(), flowRate2);
+
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
+
+        assertEq(app.currentPhaseEndTime(), firstBidTs + biddingPhaseDuration);
+
+        // verify daix balances
+        uint256 depositSize = minRentalDuration * uint32(flowRate2);
+        assertEq(daix.balanceOf(address(app)), depositSize);
+        assertEq(daix.balanceOf(bidder1), 1 ether);
+        assertEq(daix.balanceOf(bidder2), 1 ether - depositSize);
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(bidder1), 0);
+        assertEq(daix.getNetFlowRate(bidder2), 0);
+        assertEq(daix.getNetFlowRate(beneficiary), 0);
+    }
+
+    function testSecondBidCloseToDeadline() public {
+        // test second bid is close to the end of the bidding phase, so it gets extended
+
+        int32 flowRate1 = 100;
+        int32 flowRate2 = 200;
+
+        address bidder1 = vm.addr(1);
+        address bidder2 = vm.addr(2);
+
+        uint256 firstBidTs = block.timestamp;
+
+        bid(bidder1, flowRate1);
+
+        vm.warp(firstBidTs + biddingPhaseDuration - biddingPhaseExtensionDuration + 1);
+        uint256 secondBidTs = block.timestamp;
+        bid(bidder2, flowRate2);
+
+        // verify the app's state variables
+
+        assertEq(app.currentWinner(), bidder2);
+        assertEq(app.topFlowRate(), flowRate2);
+
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
+
+        assertEq(app.currentPhaseEndTime(), secondBidTs + biddingPhaseExtensionDuration);
+
+        // verify daix balances
+        uint256 depositSize = minRentalDuration * uint32(flowRate2);
+        assertEq(daix.balanceOf(address(app)), depositSize);
+        assertEq(daix.balanceOf(bidder1), 1 ether);
+        assertEq(daix.balanceOf(bidder2), 1 ether - depositSize);
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(bidder1), 0);
+        assertEq(daix.getNetFlowRate(bidder2), 0);
+        assertEq(daix.getNetFlowRate(beneficiary), 0);        
+    }
 
     function testTransitionToRentalPhase(int96 flowRate) public {
         vm.assume(flowRate > 0);
+
+        address renter = vm.addr(1);
         
         testSuccessfulBid(flowRate);
 
-        address renter = vm.addr(1);
 
         vm.warp(app.currentPhaseEndTime());
 
