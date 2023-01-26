@@ -256,11 +256,13 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
     }
 
-    function testSecondBidCloseToDeadline() public {
+    function testSecondBidCloseToDeadline(int32 flowRate1, int32 flowRate2) public {
         // test second bid is close to the end of the bidding phase, so it gets extended
 
-        int32 flowRate1 = 100;
-        int32 flowRate2 = 200;
+        vm.assume(flowRate1 >= reserveRate);
+        vm.assume(uint32(flowRate1) * minRentalDuration < 0.5 ether);
+        vm.assume(uint32(flowRate2) * minRentalDuration < 0.5 ether);
+        vm.assume(flowRate2 > 0 && app.isBidHigher(flowRate2, flowRate1));
 
         address bidder1 = vm.addr(1);
         address bidder2 = vm.addr(2);
@@ -449,5 +451,60 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+    }
+
+    function testReclaimDeposit(int96 flowRate) public {
+        address renter = vm.addr(1);
+
+        vm.expectRevert(bytes4(keccak256("NotRentalPhase()")));
+        app.reclaimDeposit();
+
+        testTransitionToRentalPhase(flowRate);
+
+        uint256 rentalStartTs = block.timestamp;
+        
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        app.reclaimDeposit();
+
+        vm.prank(renter);
+        vm.expectRevert(bytes4(keccak256("TooEarlyToReclaimDeposit()")));
+        app.reclaimDeposit();
+
+        vm.warp(rentalStartTs + minRentalDuration - 1);
+
+        vm.prank(renter);
+        vm.expectRevert(bytes4(keccak256("TooEarlyToReclaimDeposit()")));
+        app.reclaimDeposit();
+
+        vm.warp(rentalStartTs + minRentalDuration);
+
+        vm.prank(renter);
+        app.reclaimDeposit();
+
+        // verify app's state variables
+        assertEq(app.currentWinner(), renter);
+        assertEq(app.topFlowRate(), flowRate);
+
+        assertEq(app.isBiddingPhase(), false);
+        assertEq(app.depositClaimed(), true);
+
+        assertEq(app.currentPhaseEndTime(), rentalStartTs + maxRentalDuration);
+
+        // verify daix balances
+        uint256 streamedAmount = (block.timestamp - rentalStartTs) * uint96(flowRate);
+        assertEq(daix.balanceOf(address(app)), 0);
+        assertEq(daix.balanceOf(beneficiary), streamedAmount);
+        assertLt(daix.balanceOf(renter), 1 ether - streamedAmount); // less than because of superfluid deposit
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(renter), -flowRate);
+        assertEq(daix.getNetFlowRate(beneficiary), flowRate);
+
+
+        // should fail when they try to do it again
+        vm.prank(renter);
+        vm.expectRevert(bytes4(keccak256("DepositAlreadyClaimed()")));
+        app.reclaimDeposit();
     }
 }

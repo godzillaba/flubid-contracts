@@ -87,7 +87,6 @@ in the bidding phase:
 
 
     TODOTODOTODOTODO
-        implement reclaiming deposit
         implement pausing/unpausing
 
         think hard about constructor parameters, what restrictions must be placed, what can go wrong?
@@ -180,11 +179,15 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     error NotPaused();
 
     error NotBiddingPhase();
+    error NotRentalPhase();
 
     error AlreadyInRentalPhase();
     error CurrentPhaseNotEnded();
 
     error AlreadyInBiddingPhase();
+
+    error DepositAlreadyClaimed();
+    error TooEarlyToReclaimDeposit();
 
     error Unknown();
 
@@ -327,6 +330,23 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     }
     function placeBid(int96 flowRate) external whenBiddingPhase {
         _placeBid(msg.sender, flowRate);
+    }
+
+    function reclaimDeposit() external {
+        if (isBiddingPhase) revert NotRentalPhase();
+
+        address _currentWinner = currentWinner;
+
+        if (msg.sender != _currentWinner) revert Unauthorized();
+
+        if (depositClaimed) revert DepositAlreadyClaimed();
+
+        uint256 rentalStartTs = currentPhaseEndTime - maxRentalDuration;
+        if (block.timestamp < rentalStartTs + minRentalDuration) revert TooEarlyToReclaimDeposit();
+
+        depositClaimed = true;
+
+        acceptedToken.transfer(_currentWinner, uint96(topFlowRate) * minRentalDuration);
     }
 
     // starting state in rental phase:
