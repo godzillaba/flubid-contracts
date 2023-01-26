@@ -258,6 +258,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     }
 
     modifier whenBiddingPhase() {
+        // TODO: make sure this is legit
         if (!isBiddingPhase || (currentPhaseEndTime > 0 && block.timestamp >= currentPhaseEndTime)) revert NotBiddingPhase();
         _;
     }
@@ -405,20 +406,15 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         if (block.timestamp < currentPhaseEndTime) revert CurrentPhaseNotEnded();
 
-        // delete flow from current renter to trigger afterAgreementTerminated callback
-        // THIS CAN FAIL (maybe the currentWinner revoked this app's flow operator role)
-        try host.callAgreement(
-            cfa,
-            abi.encodeCall(
-                cfa.deleteFlowByOperator,
-                (acceptedToken, currentWinner, address(this), new bytes(0))
-            ),
-            new bytes(0)
-        ) {}
-        catch {
-            // the incoming flow from the currentWinner has NOT been terminated
-            // they will continue streaming into this superapp, but lets just pretend that it's not happening
-            // TODO: there is a function where anyone can send acceptedToken stuck in this contract to the beneficiary
+        // delete flow to beneficiary (not reentrant)
+        acceptedToken.deleteFlow(address(this), beneficiary);
+
+        // return deposit (not reentrant)
+        if (!depositClaimed) {
+            acceptedToken.transfer(currentWinner, uint96(topFlowRate) * minRentalDuration); 
+        } 
+        else {
+            depositClaimed = false;
         }
 
         // set state variables for beginning of bidding phase
@@ -426,12 +422,22 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         
         currentPhaseEndTime = 0;
         topFlowRate = 0;
-        depositClaimed = false;
 
-        // delete flow to beneficiary
-        acceptedToken.deleteFlow(address(this), beneficiary);
-
-        // TODO: return deposit
+        // delete flow from current renter (for some reason this DOES NOT trigger afterAgreementTerminated callback) (not reentrant)
+        // THIS CAN FAIL (maybe the currentWinner revoked this app's flow operator role)
+        try host.callAgreement(
+            cfa,
+            abi.encodeCall(
+                cfa.deleteFlow,
+                (acceptedToken, currentWinner, address(this), new bytes(0))
+            ),
+            new bytes(0)
+        ) {}
+        catch {
+            // the incoming flow from the currentWinner has NOT been terminated
+            // they will continue streaming into this superapp, but we transition to bidding phase anyway
+            // TODO: there is a function where anyone can send acceptedToken stuck in this contract to the beneficiary (be sure to account for legit deposits)
+        }
 
         controllerObserver.onWinnerChanged(address(0));
     }
@@ -488,7 +494,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
-        console.log("FOOOOOOOOOOOOOOOOO");
+        console.log("afterAgreementTerminated");
         // According to the app basic law, we should never revert in a termination callback
         if (_superToken != acceptedToken || _agreementClass != address(cfa)) {
             // TODO: this condition may be unnecessary because only this app can initiate streams to itself
@@ -497,31 +503,27 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         newCtx = _ctx;
 
+        address msgSender = host.decodeCtx(newCtx).msgSender;
 
-        // address msgSender = host.decodeCtx(newCtx).msgSender;
+        // if we are not in renting phase or msgSender is not currentWinner, then do nothing
 
-        // // msgSender can either be address(this), currentWinner, or a previous renter who isn't the current one
-        // // if not in the rental phase, do nothing
-        // // if in the rental phase and msgSender isn't address(this) or currentWinner, do nothing
-        // // if in the rental phase and msgSender is address(this) or currentWinner, we are transitioning to the bidding phase
+        if (!isBiddingPhase && msgSender == currentWinner) {
+            // the current renter has terminated their stream
 
+            // set state variables for beginning of bidding phase
+            isBiddingPhase = true;
+            
+            currentPhaseEndTime = 0;
+            topFlowRate = 0;
+            depositClaimed = false;
 
-        // if (!isBiddingPhase && (msgSender == address(this) || msgSender == currentWinner)) {
-        //     // we are transitioniiiiing
+            // delete flow to beneficiary
+            acceptedToken.deleteFlow(address(this), beneficiary);
 
-        //     // state vars
-        //     isBiddingPhase = true;
-        //     currentPhaseEndTime = 0;
-        //     depositClaimed = false;
+            // TODO: return deposit (or part of it)
 
-        //     // return deposit (TODO)
-
-        //     // close beneficiary stream
-        //     newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
-
-        //     // notify controller
-        //     controllerObserver.onWinnerChanged(address(0));
-        // }
+            controllerObserver.onWinnerChanged(address(0));
+        }
     }
 
     /*******************************************************

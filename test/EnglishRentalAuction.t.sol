@@ -256,8 +256,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     //     // console.log(uint96(daix.getNetFlowRate(renter)));
     // }
     
-    function testSuccessfullyTransitionToBiddingPhase() public {
-        int96 flowRate = 5;
+    function testSuccessfullyTransitionToBiddingPhase(int96 flowRate) public {
         vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testSuccessfullyTransitionToRentalPhase(flowRate);
@@ -266,23 +265,27 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.warp(app.currentPhaseEndTime());
 
+        (uint256 flowCreationTimestamp,,,) = daix.getFlowInfo(renter, address(app));
+
         app.transitionToBiddingPhase();
 
         // verify app's state variables
-        // assertEq(app.currentWinner(), renter);
-        // assertEq(app.topFlowRate(), 0);
+        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.topFlowRate(), 0);
 
-        // assertEq(app.isBiddingPhase(), true);
-        // assertEq(app.depositClaimed(), false);
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
 
-        // assertEq(app.currentPhaseEndTime(), 0);
+        assertEq(app.currentPhaseEndTime(), 0);
 
-        // // verify daix balances
-        // uint256 depositSize = minRentalDuration * uint96(flowRate);
-        // assertEq(daix.balanceOf(address(app)), depositSize); // todo: this should be 0!
+        // verify daix balances
+        uint256 amountFlowed = uint96(flowRate) * (block.timestamp - flowCreationTimestamp);
+        assertEq(daix.balanceOf(address(app)), 0);
+        assertEq(daix.balanceOf(beneficiary), amountFlowed);
+        assertEq(daix.balanceOf(renter), 1 ether - amountFlowed);
 
-        // // verify streams
-        // assertEq(daix.getNetFlowRate(address(app)), 0);
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
     }
