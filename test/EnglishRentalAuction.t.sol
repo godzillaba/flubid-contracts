@@ -188,6 +188,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         address user = vm.addr(1);
 
+        reportedWinner = reportedWinnerPlaceholder;
+
         bid(user, flowRate);
 
         // verify the app's state variables
@@ -209,6 +211,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(user), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // verify callback
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
     }
     
     // TODO
@@ -226,6 +231,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address bidder2 = vm.addr(2);
 
         uint256 firstBidTs = block.timestamp;
+
+        reportedWinner = reportedWinnerPlaceholder;
 
         bid(bidder1, flowRate1);
 
@@ -254,6 +261,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(bidder1), 0);
         assertEq(daix.getNetFlowRate(bidder2), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // verify callback
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
     }
 
     function testSecondBidCloseToDeadline(int32 flowRate1, int32 flowRate2) public {
@@ -268,6 +278,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address bidder2 = vm.addr(2);
 
         uint256 firstBidTs = block.timestamp;
+
+        reportedWinner = reportedWinnerPlaceholder;
 
         bid(bidder1, flowRate1);
 
@@ -295,7 +307,10 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(bidder1), 0);
         assertEq(daix.getNetFlowRate(bidder2), 0);
-        assertEq(daix.getNetFlowRate(beneficiary), 0);        
+        assertEq(daix.getNetFlowRate(beneficiary), 0);  
+
+        // verify callback
+        assertEq(reportedWinner, reportedWinnerPlaceholder);
     }
 
     function testTransitionToRentalPhase(int96 flowRate) public {
@@ -327,6 +342,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), -flowRate);
         assertEq(daix.getNetFlowRate(beneficiary), flowRate);
+
+        // verify callback
+        assertEq(reportedWinner, renter);
     }
 
     function testTransitionToBiddingPhase(int96 flowRate) public {
@@ -339,6 +357,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.warp(app.currentPhaseEndTime());
 
         (uint256 flowCreationTimestamp,,,) = daix.getFlowInfo(renter, address(app));
+
+        reportedWinner = reportedWinnerPlaceholder;
 
         app.transitionToBiddingPhase();
 
@@ -361,6 +381,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // verify callback
+        assertEq(reportedWinner, address(0));
     }
 
     function testRenterTerminateStreamAfterMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -371,6 +394,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testTransitionToRentalPhase(flowRate);
+
+        reportedWinner = reportedWinnerPlaceholder;
 
         vm.warp(block.timestamp + duration);
 
@@ -406,6 +431,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // verify callback
+        assertEq(reportedWinner, address(0));
     }
 
     function testRenterTerminateStreamBeforeMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -416,6 +444,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testTransitionToRentalPhase(flowRate);
+
+        reportedWinner = reportedWinnerPlaceholder;
 
         vm.warp(block.timestamp + duration);
 
@@ -451,6 +481,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(renter), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // verify callback
+        assertEq(reportedWinner, address(0));
     }
 
     function testReclaimDeposit(int96 flowRate) public {
