@@ -16,84 +16,6 @@ import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionCon
 import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 
 
-/*
-
-english auction:
-
-there are two phases: bidding and renting
-
-in the bidding phase:
-    anyone can place a bid (value being flowrate) if it is at least X% higher than the current highest bid
-    when they place a bid:
-        a deposit is taken (flowRate * minRentalDuration)
-        the "bidding time" is extended by `biddingPeriodExtensionTime`
-
-    when the bidding phase expires, it moves to the renting period
-        the winning bidder idealy should immediately should get the item and be streaming to the beneficiary
-
-
-
-
-    here's what would be ideal:
-        in one batch do:
-            approve superapp to spend daix
-            approve superapp to create/update/delete flows
-            call superapp function that does:
-                if this is not the top bid revert
-                pull daix deposit (flowRate * minRentalDuration)
-
-                (when the bidding period is over and someone calls fn to transition to rental period it starts the flow) 
-                    (also would be super sick if MEVooors were incented to call this, maybe a fee taken from someone to pay tx fee. we don't want people to have to set up keepers)
-
-        
-        this might be possible using superfluid's batch stuff check superfluid.sol line 817
-
-
-    state transition:
-        bidding -> renting:
-            biddingPeriodEnd > 0 && biddingPeriodEnd < block.timestamp
-                ^ when biddingPeriodEnd is 0 that means there are no bids yet
-
-        renting -> bidding:
-            rentingPeriodEnd < block.timestamp || "renter closed their stream"
-
-            effects:
-                return renter's deposit if they haven't gotten it already
-
-
-    state in rental phase:
-        the renter is streaming to app
-        there may be other incoming streams to the app
-        app is streaming to beneficiary
-
-        currentWinner = renter
-        topFlowRate = renter's flow rate
-        senderUserData = whatever
-        paused = false
-        depositClaimed = true or false
-        currentPhaseEndTime = time at which rental expires and bidding can start again
-
-    state in bidding phase:
-        app is NOT streaming to beneficiary
-        there may be some incoming streams to the app
-
-        currentWinner = undefined? (or 0x00?)
-        topFlowRate = 0
-        senderUserData = whatever
-        paused = false
-        depositClaimed = false
-        currentPhaseEndTime = 0 if no bids yet or the time at which bidding ends if no more bids are placed close to the end
-
-
-
-    TODOTODOTODOTODO
-        implement pausing/unpausing
-        test onWinnerChanged
-
-        think hard about constructor parameters, what restrictions must be placed, what can go wrong?
-
-*/
-
 contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
@@ -206,16 +128,20 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         uint256 _biddingPhaseDuration,
         uint256 _biddingPhaseExtensionDuration
     ) external initializer {
-        require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
+        require(address(_host) != address(0));
+        require(address(_cfa) != address(0));
+
         require(_beneficiary != address(0));
 
-        require(_minimumBidFactorWad < uint256(type(uint160).max));
+        // require(_minimumBidFactorWad < uint256(type(uint160).max));
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
+        require(_minRentalDuration > 0);
         require(_maxRentalDuration >= _minRentalDuration);
 
+        require(_biddingPhaseExtensionDuration > 0);
         require(_biddingPhaseDuration >= _biddingPhaseExtensionDuration);
 
         // TODO: think more about minRentalDuration, it can't be too small. is 1 enough? if no, what is?
