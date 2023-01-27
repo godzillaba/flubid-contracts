@@ -507,4 +507,46 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectRevert(bytes4(keccak256("DepositAlreadyClaimed()")));
         app.reclaimDeposit();
     }
+
+    function testPauseFailing(int96 flowRate) public {
+        vm.prank(vm.addr(1));
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
+        app.pause();
+
+        testTransitionToRentalPhase(flowRate);
+
+        vm.expectRevert(bytes4(keccak256("NotBiddingPhase()")));
+        app.pause();
+    }
+
+    function testPauseSuccess() public {
+        int96 flowRate = reserveRate;
+
+        address bidder = vm.addr(1);
+
+        bid(bidder, flowRate);
+
+        app.pause();
+
+        // verify the app's state variables
+
+        assertEq(app.currentWinner(), bidder);
+        assertEq(app.topFlowRate(), 0);
+
+        assertEq(app.isBiddingPhase(), true);
+        assertEq(app.depositClaimed(), false);
+
+        assertEq(app.currentPhaseEndTime(), 0);
+
+        assertEq(app.paused(), true);
+
+        // verify daix balances
+        assertEq(daix.balanceOf(address(app)), 0);
+        assertEq(daix.balanceOf(bidder), 1 ether);
+
+        // verify streams
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(bidder), 0);
+        assertEq(daix.getNetFlowRate(beneficiary), 0);
+    }
 }

@@ -88,6 +88,7 @@ in the bidding phase:
 
     TODOTODOTODOTODO
         implement pausing/unpausing
+        test onWinnerChanged
 
         think hard about constructor parameters, what restrictions must be placed, what can go wrong?
 
@@ -321,18 +322,18 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // will revert if it is not approved for ERC20 transfer
     // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.
     // todo: userData
-    function placeBid(int96 flowRate, bytes calldata _ctx) external onlyHost whenBiddingPhase returns (bytes memory) {
+    function placeBid(int96 flowRate, bytes calldata _ctx) external onlyHost whenBiddingPhase whenNotPaused returns (bytes memory) {
         address msgSender = host.decodeCtx(_ctx).msgSender;
         
         _placeBid(msgSender, flowRate);
 
         return _ctx;
     }
-    function placeBid(int96 flowRate) external whenBiddingPhase {
+    function placeBid(int96 flowRate) external whenBiddingPhase whenNotPaused {
         _placeBid(msg.sender, flowRate);
     }
 
-    function reclaimDeposit() external {
+    function reclaimDeposit() external whenNotPaused {
         if (isBiddingPhase) revert NotRentalPhase();
 
         address _currentWinner = currentWinner;
@@ -395,7 +396,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     //     depositClaimed = false
     //     currentPhaseEndTime = time at which bidding ended
 
-    function transitionToRentalPhase() external {
+    function transitionToRentalPhase() external whenNotPaused {
         if (!isBiddingPhase) revert AlreadyInRentalPhase();
 
         // if currentPhaseEndTime > 0 then topFlowRate and currentWinner must be set correctly
@@ -427,7 +428,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // todo: explore how to pay the caller of this function (maybe with the deposit?)
     }
 
-    function transitionToBiddingPhase() external {
+    function transitionToBiddingPhase() external whenNotPaused {
         if (isBiddingPhase) revert AlreadyInBiddingPhase();
 
         if (block.timestamp < currentPhaseEndTime) revert CurrentPhaseNotEnded();
@@ -497,14 +498,19 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     
 
     function afterAgreementTerminated(
-        ISuperToken, //_superToken,
-        address, // _agreementClass,
+        ISuperToken _superToken,
+        address _agreementClass,
         bytes32, // _agreementId,
         bytes calldata, // _agreementData
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
         console.log("afterAgreementTerminated");
+        // According to the app basic law, we should never revert in a termination callback
+        if (_superToken != acceptedToken || _agreementClass != address(cfa)) {
+            // Is this necessary? could IDA trigger this?
+            return _ctx;
+        }
 
         newCtx = _ctx;
 
@@ -550,11 +556,23 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
-    function pause() external onlyController whenNotPaused {
+    function pause() external onlyController whenNotPaused whenBiddingPhase {
+        paused = true;
+
+        // refund any deposit
+        if (topFlowRate > 0) {
+            acceptedToken.transfer(currentWinner, uint96(topFlowRate) * minRentalDuration);
+        }
+
+        // set state variables to be beginning of bidding phase
+        isBiddingPhase = true;
+        depositClaimed = false;
         
+        currentPhaseEndTime = 0;
+        topFlowRate = 0;
     }
 
     function unpause() external onlyController whenPaused {
-        
+        paused = false;
     }
 }
