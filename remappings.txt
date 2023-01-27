@@ -4,3 +4,4 @@ erc4626-tests/=lib/openzeppelin-contracts/lib/erc4626-tests/
 superfluid-finance/=lib/ethereum-contracts/packages/ethereum-contracts/
 forge-std/=lib/forge-std/src/
 @openzeppelin/=lib/openzeppelin-contracts/
+openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
