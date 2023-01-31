@@ -6,6 +6,8 @@ import { ERC721 } from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 import { IERC165 } from "openzeppelin-contracts/interfaces/IERC165.sol";
 
+// https://eips.ethereum.org/EIPS/eip-4907
+
 contract ERC4907 is IERC4907, ERC721 {
     struct UserInfo 
     {

@@ -28,6 +28,9 @@ import { EnglishRentalAuction } from "../src/EnglishRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
+// TODO: make sure it does NOT transition to bidding phase when non-renter closes their stream during rental phase
+// TODO: test events
+
 contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
@@ -111,6 +114,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         );
     }
 
+    // todo: make sure this is only called ONCE. have a counter that is set to 0 before this is expected to be called
     function onWinnerChanged(address newWinner) public {
         reportedWinner = newWinner;
     }

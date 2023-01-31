@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.sol";
-
 import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 import { IERC4907 } from "../interfaces/IERC4907.sol";
@@ -16,6 +14,9 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
 
     IRentalAuction public rentalAuction; 
 
+    event AuctionStopped();
+    event AuctionStarted();
+
     error Unauthorized();
 
     error TokenNotOwned();
@@ -26,7 +27,7 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
         rentalAuction = _rentalAuction;
         (tokenContract, tokenId) = abi.decode(extraArgs, (IERC4907, uint256));
 
-        rentalAuction.pause(); // pause the auction because we need to get the nft in here first
+        _rentalAuction.pause(); // pause the auction because we need to get the nft in here first
     }
 
     modifier onlyRentalAuction {
@@ -44,6 +45,8 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
 
         // send back the nft
         tokenContract.transferFrom(address(this), owner(), tokenId);
+
+        emit AuctionStopped();
     }
 
     function startAuction() external onlyOwner {
@@ -52,5 +55,7 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
 
         // pull in the nft
         tokenContract.transferFrom(owner(), address(this), tokenId);
+
+        emit AuctionStarted();
     }
 }

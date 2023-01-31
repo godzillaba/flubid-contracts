@@ -79,6 +79,20 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     
     event NewTopBid(address indexed bidder, int96 flowRate);
 
+    event DepositClaimed(address indexed renter, uint256 amount);
+
+    event TransitionedToRentalPhase(address indexed renter, int96 flowRate);
+
+    event TransitionedToBiddingPhase();
+
+    event TransitionToRentalPhaseFailed(address indexed topBidder, int96 flowRate);
+
+    event TransitionedToBiddingPhaseEarly(address indexed renter, int96 flowRate);
+
+    event UnpausedAuction();
+
+    event PausedAuction(address indexed topBidder, int96 flowRate);
+
     /*******************************************************
      * 
      * Errors
@@ -272,8 +286,11 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         if (block.timestamp < rentalStartTs + minRentalDuration) revert TooEarlyToReclaimDeposit();
 
         depositClaimed = true;
+        uint256 depositSize = uint96(topFlowRate) * minRentalDuration;
 
-        acceptedToken.transfer(_currentWinner, uint96(topFlowRate) * minRentalDuration);
+        acceptedToken.transfer(_currentWinner, depositSize);
+
+        emit DepositClaimed(_currentWinner, depositSize);
     }
 
     // starting state in rental phase:
@@ -332,11 +349,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // it can fail if the winner has not approved the app as a flow operator
         // if it does fail, take their deposit and restart bidding phase
         int96 _topFlowRate = topFlowRate;
+        address _currentWinner = currentWinner;
         try host.callAgreement(
             cfa,
             abi.encodeCall(
                 cfa.createFlowByOperator,
-                (acceptedToken, currentWinner, address(this), _topFlowRate, new bytes(0))
+                (acceptedToken, _currentWinner, address(this), _topFlowRate, new bytes(0))
             ),
             new bytes(0)
         ) {
@@ -349,6 +367,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             // restart bidding phase
             topFlowRate = 0;
             currentPhaseEndTime = 0;
+
+            emit TransitionToRentalPhaseFailed(_currentWinner, _topFlowRate);
         }
 
         // todo: explore how to pay the caller of this function (maybe with the deposit?)
@@ -411,13 +431,18 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // stream sender must be the currentWinner and we are transitioning to the rental phase
 
+        address _currentWinner = currentWinner;
+        int96 _topFlowRate = topFlowRate;
+
         isBiddingPhase = false;
 
         currentPhaseEndTime = block.timestamp + maxRentalDuration;
 
-        newCtx = acceptedToken.createFlowWithCtx(beneficiary, topFlowRate, _ctx);
+        newCtx = acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, _ctx);
 
-        if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(currentWinner);
+        if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(_currentWinner);
+        
+        emit TransitionedToRentalPhase(_currentWinner, _topFlowRate);
     }
 
 
@@ -440,10 +465,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         newCtx = _ctx;
 
+        address _currentWinner = currentWinner;
+        int96 _topFlowRate = topFlowRate;
+
         address msgSender = host.decodeCtx(newCtx).msgSender;
 
         // if we are not in renting phase or msgSender is not currentWinner, then do nothing
-        if (!isBiddingPhase && msgSender == currentWinner) {
+        if (!isBiddingPhase && msgSender == _currentWinner) {
             // the current renter has terminated their stream
             
             // delete flow to beneficiary (not reentrant)
@@ -451,17 +479,15 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
             // return deposit (or part of it)
             if (!depositClaimed) {
-                uint256 streamedAmount = uint96(topFlowRate) * (block.timestamp + maxRentalDuration - currentPhaseEndTime );
-                uint256 depositSize = uint96(topFlowRate) * minRentalDuration;
+                uint256 streamedAmount = uint96(_topFlowRate) * (block.timestamp + maxRentalDuration - currentPhaseEndTime );
+                uint256 depositSize = uint96(_topFlowRate) * minRentalDuration;
 
                 if (streamedAmount >= depositSize) {
                     // not reentrant
                     acceptedToken.transfer(msgSender, depositSize);
                 }
                 else {
-                    unchecked {
-                        acceptedToken.transfer(beneficiary, depositSize - streamedAmount);
-                    }
+                    acceptedToken.transfer(beneficiary, depositSize - streamedAmount);
                     acceptedToken.transfer(msgSender, streamedAmount);
                 }
             }
@@ -473,6 +499,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             depositClaimed = false;
 
             if (address(controllerObserver) != address(0)) controllerObserver.onWinnerChanged(address(0));
+
+            emit TransitionedToBiddingPhaseEarly(_currentWinner, _topFlowRate);
         }
     }
 
@@ -485,9 +513,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     function pause() external onlyController whenNotPaused whenBiddingPhase {
         paused = true;
 
+        address _currentWinner = currentWinner;
+        int96 _topFlowRate = topFlowRate;
+
         // refund any deposit
-        if (topFlowRate > 0) {
-            acceptedToken.transfer(currentWinner, uint96(topFlowRate) * minRentalDuration);
+        if (_topFlowRate > 0) {
+            acceptedToken.transfer(_currentWinner, uint96(_topFlowRate) * minRentalDuration);
         }
 
         // set state variables to be beginning of bidding phase
@@ -496,9 +527,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         
         currentPhaseEndTime = 0;
         topFlowRate = 0;
+
+        emit PausedAuction(_currentWinner, _topFlowRate);
     }
 
     function unpause() external onlyController whenPaused {
         paused = false;
+
+        emit UnpausedAuction();
     }
 }
