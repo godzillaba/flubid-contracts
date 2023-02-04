@@ -6,3 +6,9 @@ libs = ['lib']
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
 gas_reports = ["ContinuousRentalAuction", "ContinuousRentalAuctionWithTestFunctions", "EnglishRentalAuction"]
+
+[rpc_endpoints]
+goerli = "${GOERLI_RPC_URL}"
+
+[etherscan]
+goerli = { key = "${ETHERSCAN_API_KEY}" }

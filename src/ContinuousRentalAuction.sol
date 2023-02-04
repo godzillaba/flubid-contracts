@@ -90,7 +90,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     int96 public reserveRate;
 
-    event NewTopStreamer(address indexed oldWinner, address indexed newTopStreamer);
+    event NewTopStreamer(address indexed oldWinner, address indexed newTopStreamer); // todo: add flowrate to this
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);

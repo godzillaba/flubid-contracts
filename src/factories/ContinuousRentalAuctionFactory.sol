@@ -24,8 +24,15 @@ contract ContinuousRentalAuctionFactory {
         SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
         SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;
 
-    event ContinuousRentalAuctionDeployed(address indexed auctionAddress, address indexed controllerObserverAddress);
-    event RentalAuctionControllerObserverDeployed(address indexed controllerObserverImplementation, address indexed controllerObserverAddress, address indexed auctionAddress);
+    event ContinuousRentalAuctionDeployed(
+        address indexed auctionAddress, 
+        address indexed controllerObserverAddress
+    );
+    event RentalAuctionControllerObserverDeployed(
+        address indexed controllerObserverImplementation, 
+        address indexed controllerObserverAddress, 
+        address indexed auctionAddress
+    );
 
     constructor(address _host, address _cfa) {
         implementation = address(new ContinuousRentalAuction());
