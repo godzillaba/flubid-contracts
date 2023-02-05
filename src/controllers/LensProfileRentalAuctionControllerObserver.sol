@@ -3,13 +3,14 @@ pragma solidity ^0.8.0;
 
 import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import { IERC4907 } from "../interfaces/IERC4907.sol";
+import { LensHub } from "lens-protocol/core/LensHub.sol";
+import { DataTypes } from "lens-protocol/libraries/DataTypes.sol";
 
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
-contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
-    IERC4907 public tokenContract;
+contract LensProfileRentalAuctionControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
+    LensHub constant lensHub = LensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
     uint256 public tokenId;
 
     IRentalAuction public rentalAuction; 
@@ -25,7 +26,7 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
         __Ownable_init();
 
         rentalAuction = _rentalAuction;
-        (tokenContract, tokenId) = abi.decode(extraArgs, (IERC4907, uint256));
+        (tokenId) = abi.decode(extraArgs, (uint256));
 
         _rentalAuction.pause(); // pause the auction because we need to get the nft in here first
     }
@@ -35,16 +36,19 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
         _;
     }
 
-    function onRenterChanged(address newRenter) external onlyRentalAuction {
-        tokenContract.setUser(tokenId, newRenter, type(uint64).max);
+    modifier onlyRenter {
+        if (msg.sender != rentalAuction.currentRenter()) revert Unauthorized();
+        _;
     }
+
+    function onRenterChanged(address newRenter) external pure {}
 
     function stopAuction() external onlyOwner {
         // pause auction
         rentalAuction.pause();
 
         // send back the nft
-        tokenContract.transferFrom(address(this), owner(), tokenId);
+        lensHub.transferFrom(address(this), owner(), tokenId);
 
         emit AuctionStopped();
     }
@@ -54,8 +58,12 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
         rentalAuction.unpause();
 
         // pull in the nft
-        tokenContract.transferFrom(owner(), address(this), tokenId);
+        lensHub.transferFrom(owner(), address(this), tokenId);
 
         emit AuctionStarted();
+    }
+
+    function post(DataTypes.PostData calldata postData) external onlyRenter {
+        lensHub.post(postData);
     }
 }

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol";
 
@@ -198,7 +198,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentRenter(), user);
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), flowRate);
 
         assertEq(app.isBiddingPhase(), true);
@@ -246,7 +246,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentRenter(), bidder2);
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), flowRate2);
 
         assertEq(app.isBiddingPhase(), true);
@@ -293,7 +293,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentRenter(), bidder2);
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), flowRate2);
 
         assertEq(app.isBiddingPhase(), true);
@@ -324,6 +324,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         
         testSuccessfulBid(flowRate);
 
+        reportedRenter = reportedRenterPlaceholder;
 
         vm.warp(app.currentPhaseEndTime());
 
@@ -367,7 +368,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.transitionToBiddingPhase();
 
         // verify app's state variables
-        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -417,7 +418,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         );
 
         // verify app's state variables
-        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -467,7 +468,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         );
 
         // verify app's state variables
-        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), address(0)); // this is undefined, doesn't have to be renter necessarily
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -567,7 +568,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentRenter(), bidder);
+        assertEq(app.currentRenter(), address(0));
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);

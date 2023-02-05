@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.0;
 
 import "forge-std/Test.sol"; // TODO: REMOVE
 
@@ -54,7 +54,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
-    address public currentRenter;
+    address public topBidder;
     int96 public topFlowRate;
 
     /// @dev maps a bidder to their user data. They provide this data when placing a bid
@@ -221,6 +221,10 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
+    function currentRenter() public view returns (address) {
+        return isBiddingPhase ? address(0) : topBidder;
+    }
+
     function _placeBid(address msgSender, int96 flowRate) private {
         // check that the flowRate is valid and higher than the last bid
         if (flowRate <= 0) revert InvalidFlowRate();
@@ -230,9 +234,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         int96 oldTopFlowRate = topFlowRate;
         topFlowRate = flowRate;
 
-        // save this user's address as currentRenter
-        address oldcurrentRenter = currentRenter;
-        currentRenter = msgSender;
+        // save this user's address as topBidder
+        address oldTopBidder = topBidder;
+        topBidder = msgSender;
 
         // extend bidding period if close to the end or set it if it's the first bid
         if (currentPhaseEndTime == 0) {
@@ -251,7 +255,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // return the deposit of the last bidder (if there is one)
         if (oldTopFlowRate != 0) {
-            acceptedToken.transfer(oldcurrentRenter, uint96(oldTopFlowRate) * minRentalDuration);
+            acceptedToken.transfer(oldTopBidder, uint96(oldTopFlowRate) * minRentalDuration);
         }
 
         emit NewTopBid(msgSender, flowRate);
@@ -276,9 +280,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     function reclaimDeposit() external whenNotPaused {
         if (isBiddingPhase) revert NotRentalPhase();
 
-        address _currentRenter = currentRenter;
+        address _topBidder = topBidder;
 
-        if (msg.sender != _currentRenter) revert Unauthorized();
+        if (msg.sender != _topBidder) revert Unauthorized();
 
         if (depositClaimed) revert DepositAlreadyClaimed();
 
@@ -288,9 +292,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         depositClaimed = true;
         uint256 depositSize = uint96(topFlowRate) * minRentalDuration;
 
-        acceptedToken.transfer(_currentRenter, depositSize);
+        acceptedToken.transfer(_topBidder, depositSize);
 
-        emit DepositClaimed(_currentRenter, depositSize);
+        emit DepositClaimed(_topBidder, depositSize);
     }
 
     // starting state in rental phase:
@@ -349,12 +353,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // it can fail if the renter has not approved the app as a flow operator
         // if it does fail, take their deposit and restart bidding phase
         int96 _topFlowRate = topFlowRate;
-        address _currentRenter = currentRenter;
+        address _topBidder = topBidder;
         try host.callAgreement(
             cfa,
             abi.encodeCall(
                 cfa.createFlowByOperator,
-                (acceptedToken, _currentRenter, address(this), _topFlowRate, new bytes(0))
+                (acceptedToken, _topBidder, address(this), _topFlowRate, new bytes(0))
             ),
             new bytes(0)
         ) {
@@ -368,7 +372,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             topFlowRate = 0;
             currentPhaseEndTime = 0;
 
-            emit TransitionToRentalPhaseFailed(_currentRenter, _topFlowRate);
+            emit TransitionToRentalPhaseFailed(_topBidder, _topFlowRate);
         }
 
         // todo: explore how to pay the caller of this function (maybe with the deposit?)
@@ -384,7 +388,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // return deposit (not reentrant)
         if (!depositClaimed) {
-            acceptedToken.transfer(currentRenter, uint96(topFlowRate) * minRentalDuration); 
+            acceptedToken.transfer(topBidder, uint96(topFlowRate) * minRentalDuration); 
         }
 
         // set state variables for beginning of bidding phase
@@ -400,7 +404,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             cfa,
             abi.encodeCall(
                 cfa.deleteFlow,
-                (acceptedToken, currentRenter, address(this), new bytes(0))
+                (acceptedToken, topBidder, address(this), new bytes(0))
             ),
             new bytes(0)
         ) {}
@@ -431,7 +435,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // stream sender must be the currentRenter and we are transitioning to the rental phase
 
-        address _currentRenter = currentRenter;
+        address _topBidder = topBidder;
         int96 _topFlowRate = topFlowRate;
 
         isBiddingPhase = false;
@@ -440,9 +444,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         newCtx = acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, _ctx);
 
-        if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(_currentRenter);
+        if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(_topBidder);
         
-        emit TransitionedToRentalPhase(_currentRenter, _topFlowRate);
+        emit TransitionedToRentalPhase(_topBidder, _topFlowRate);
     }
 
 
@@ -465,13 +469,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         newCtx = _ctx;
 
-        address _currentRenter = currentRenter;
+        address _topBidder = topBidder;
         int96 _topFlowRate = topFlowRate;
 
         address msgSender = host.decodeCtx(newCtx).msgSender;
 
         // if we are not in renting phase or msgSender is not currentRenter, then do nothing
-        if (!isBiddingPhase && msgSender == _currentRenter) {
+        if (!isBiddingPhase && msgSender == _topBidder) {
             // the current renter has terminated their stream
             
             // delete flow to beneficiary (not reentrant)
@@ -500,7 +504,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
             if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
 
-            emit TransitionedToBiddingPhaseEarly(_currentRenter, _topFlowRate);
+            emit TransitionedToBiddingPhaseEarly(_topBidder, _topFlowRate);
         }
     }
 
@@ -513,12 +517,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     function pause() external onlyController whenNotPaused whenBiddingPhase {
         paused = true;
 
-        address _currentRenter = currentRenter;
+        address _topBidder = topBidder;
         int96 _topFlowRate = topFlowRate;
 
         // refund any deposit
         if (_topFlowRate > 0) {
-            acceptedToken.transfer(_currentRenter, uint96(_topFlowRate) * minRentalDuration);
+            acceptedToken.transfer(_topBidder, uint96(_topFlowRate) * minRentalDuration);
         }
 
         // set state variables to be beginning of bidding phase
@@ -528,7 +532,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         currentPhaseEndTime = 0;
         topFlowRate = 0;
 
-        emit PausedAuction(_currentRenter, _topFlowRate);
+        emit PausedAuction(_topBidder, _topFlowRate);
     }
 
     function unpause() external onlyController whenPaused {
