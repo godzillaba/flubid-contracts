@@ -65,9 +65,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     uint256 biddingPhaseDuration = 1 days;
     uint256 biddingPhaseExtensionDuration = 2 hours;
 
-    address reportedWinner;
+    address reportedRenter;
 
-    address constant reportedWinnerPlaceholder = address(type(uint160).max);
+    address constant reportedRenterPlaceholder = address(type(uint160).max);
 
     function setUp() public {
         SuperfluidFrameworkDeployer sfDeployer = new SuperfluidFrameworkDeployer();
@@ -115,8 +115,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     // todo: make sure this is only called ONCE. have a counter that is set to 0 before this is expected to be called
-    function onWinnerChanged(address newWinner) public {
-        reportedWinner = newWinner;
+    function onRenterChanged(address newRenter) public {
+        reportedRenter = newRenter;
     }
 
     function initialize(IRentalAuction, bytes calldata) external view {}
@@ -192,13 +192,13 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         address user = vm.addr(1);
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         bid(user, flowRate);
 
         // verify the app's state variables
 
-        assertEq(app.currentWinner(), user);
+        assertEq(app.currentRenter(), user);
         assertEq(app.topFlowRate(), flowRate);
 
         assertEq(app.isBiddingPhase(), true);
@@ -217,7 +217,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
 
         // verify callback
-        assertEq(reportedWinner, reportedWinnerPlaceholder);
+        assertEq(reportedRenter, reportedRenterPlaceholder);
     }
     
     // TODO
@@ -236,7 +236,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         uint256 firstBidTs = block.timestamp;
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         bid(bidder1, flowRate1);
 
@@ -246,7 +246,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentWinner(), bidder2);
+        assertEq(app.currentRenter(), bidder2);
         assertEq(app.topFlowRate(), flowRate2);
 
         assertEq(app.isBiddingPhase(), true);
@@ -267,7 +267,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
 
         // verify callback
-        assertEq(reportedWinner, reportedWinnerPlaceholder);
+        assertEq(reportedRenter, reportedRenterPlaceholder);
     }
 
     function testSecondBidCloseToDeadline(int32 flowRate1, int32 flowRate2) public {
@@ -283,7 +283,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         uint256 firstBidTs = block.timestamp;
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         bid(bidder1, flowRate1);
 
@@ -293,7 +293,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentWinner(), bidder2);
+        assertEq(app.currentRenter(), bidder2);
         assertEq(app.topFlowRate(), flowRate2);
 
         assertEq(app.isBiddingPhase(), true);
@@ -314,7 +314,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);  
 
         // verify callback
-        assertEq(reportedWinner, reportedWinnerPlaceholder);
+        assertEq(reportedRenter, reportedRenterPlaceholder);
     }
 
     function testTransitionToRentalPhase(int96 flowRate) public {
@@ -330,7 +330,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.transitionToRentalPhase();
 
         // verify app's state variables
-        assertEq(app.currentWinner(), renter);
+        assertEq(app.currentRenter(), renter);
         assertEq(app.topFlowRate(), flowRate);
 
         assertEq(app.isBiddingPhase(), false);
@@ -348,7 +348,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), flowRate);
 
         // verify callback
-        assertEq(reportedWinner, renter);
+        assertEq(reportedRenter, renter);
     }
 
     function testTransitionToBiddingPhase(int96 flowRate) public {
@@ -362,12 +362,12 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         (uint256 flowCreationTimestamp,,,) = daix.getFlowInfo(renter, address(app));
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         app.transitionToBiddingPhase();
 
         // verify app's state variables
-        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -387,7 +387,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
 
         // verify callback
-        assertEq(reportedWinner, address(0));
+        assertEq(reportedRenter, address(0));
     }
 
     function testRenterTerminateStreamAfterMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -399,7 +399,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         testTransitionToRentalPhase(flowRate);
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         vm.warp(block.timestamp + duration);
 
@@ -417,7 +417,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         );
 
         // verify app's state variables
-        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -437,7 +437,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
 
         // verify callback
-        assertEq(reportedWinner, address(0));
+        assertEq(reportedRenter, address(0));
     }
 
     function testRenterTerminateStreamBeforeMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -449,7 +449,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         testTransitionToRentalPhase(flowRate);
 
-        reportedWinner = reportedWinnerPlaceholder;
+        reportedRenter = reportedRenterPlaceholder;
 
         vm.warp(block.timestamp + duration);
 
@@ -467,7 +467,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         );
 
         // verify app's state variables
-        assertEq(app.currentWinner(), renter); // this is undefined, doesn't have to be renter necessarily
+        assertEq(app.currentRenter(), renter); // this is undefined, doesn't have to be renter necessarily
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);
@@ -487,7 +487,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(beneficiary), 0);
 
         // verify callback
-        assertEq(reportedWinner, address(0));
+        assertEq(reportedRenter, address(0));
     }
 
     function testReclaimDeposit(int96 flowRate) public {
@@ -519,7 +519,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.reclaimDeposit();
 
         // verify app's state variables
-        assertEq(app.currentWinner(), renter);
+        assertEq(app.currentRenter(), renter);
         assertEq(app.topFlowRate(), flowRate);
 
         assertEq(app.isBiddingPhase(), false);
@@ -567,7 +567,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify the app's state variables
 
-        assertEq(app.currentWinner(), bidder);
+        assertEq(app.currentRenter(), bidder);
         assertEq(app.topFlowRate(), 0);
 
         assertEq(app.isBiddingPhase(), true);

@@ -35,8 +35,8 @@ contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObser
         _;
     }
 
-    function onWinnerChanged(address newWinner) external onlyRentalAuction {
-        tokenContract.setUser(tokenId, newWinner, type(uint64).max);
+    function onRenterChanged(address newRenter) external onlyRentalAuction {
+        tokenContract.setUser(tokenId, newRenter, type(uint64).max);
     }
 
     function stopAuction() external onlyOwner {

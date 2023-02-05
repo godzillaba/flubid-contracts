@@ -47,9 +47,9 @@ contract ENSRentalAuctionControllerObserver is IRentalAuctionControllerObserver,
         ensRegistrar.transferFrom(address(this), to, ensTokenId);
     }
 
-    function onWinnerChanged(address newWinner) external onlyRentalAuction {
+    function onRenterChanged(address newRenter) external onlyRentalAuction {
         if (ensRegistrar.ownerOf(ensTokenId) != address(this)) revert ENSNameNotOwned();
-        _setENSNameController(newWinner);
+        _setENSNameController(newRenter);
     }
 
     // TODO: isActive or something like that. It lets the auction contract know if it can accept bids or whatever else.
@@ -73,7 +73,7 @@ contract ENSRentalAuctionControllerObserver is IRentalAuctionControllerObserver,
         rentalAuction.unpause();
 
         // set controller to current top bidder if it isn't 0x00
-        address topStreamer = rentalAuction.currentWinner();
+        address topStreamer = rentalAuction.currentRenter();
         if (topStreamer != address(0)) {
             _setENSNameController(topStreamer);
         }
