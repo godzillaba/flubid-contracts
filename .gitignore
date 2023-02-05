@@ -9,3 +9,10 @@ out/
 
 # Dotenv file
 .env
+
+
+test/misc
+RentalAuction.notes.sol
+notes
+coverage
+lcov.info
