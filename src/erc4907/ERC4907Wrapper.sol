@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import { ERC4907 } from "./ERC4907.sol";
 import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";

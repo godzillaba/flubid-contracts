@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
 import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import { LensHub } from "lens-protocol/core/LensHub.sol";
-import { DataTypes } from "lens-protocol/libraries/DataTypes.sol";
+import { ILensHub } from "../interfaces/ILensHub.sol";
+import { LensDataTypes } from "../libraries/LensDataTypes.sol";
 
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
 contract LensProfileRentalAuctionControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
-    LensHub constant lensHub = LensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
+    ILensHub constant lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
     uint256 public tokenId;
 
     IRentalAuction public rentalAuction; 
@@ -63,7 +63,7 @@ contract LensProfileRentalAuctionControllerObserver is IRentalAuctionControllerO
         emit AuctionStarted();
     }
 
-    function post(DataTypes.PostData calldata postData) external onlyRenter {
+    function post(LensDataTypes.PostData calldata postData) external onlyRenter {
         lensHub.post(postData);
     }
 }
