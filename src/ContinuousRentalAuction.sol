@@ -90,7 +90,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     int96 public reserveRate;
 
-    event NewTopStreamer(address indexed oldRenter, address indexed newTopStreamer); // todo: add flowrate to this
+    event RenterChanged(address indexed oldRenter, address indexed newRenter);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);
@@ -221,7 +221,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(streamSender);
 
             // emit Event
-            emit NewTopStreamer(oldRenter, streamSender);
+            emit RenterChanged(oldRenter, streamSender);
         }
         else {
             // this is not the top streamer
@@ -295,7 +295,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             // notify controller
             if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(currentRenter);
 
-            emit NewTopStreamer(oldRenter, currentRenter);
+            emit RenterChanged(oldRenter, currentRenter);
         }
         else {
             // update flow to sender
@@ -345,7 +345,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
             }
 
-            emit NewTopStreamer(oldRenter, address(0));
+            emit RenterChanged(oldRenter, address(0));
         }
         else if (oldRenter != newTopStreamer) {
             // deleted stream was the top and a new top has been chosen
@@ -366,7 +366,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(newTopStreamer);
             }
 
-            emit NewTopStreamer(oldRenter, newTopStreamer);
+            emit RenterChanged(oldRenter, newTopStreamer);
         }
         else {
             // deleted stream was not the top

@@ -15,6 +15,7 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 
+// TODO: optimize storage and just generally
 
 contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // SuperToken library setup

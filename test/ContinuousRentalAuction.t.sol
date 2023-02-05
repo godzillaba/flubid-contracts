@@ -28,6 +28,8 @@ import { ContinuousRentalAuction } from "../src/ContinuousRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
+// TODO: explicitly set gitmodules versions
+
 contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -47,7 +49,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
-    event NewTopStreamer(address indexed oldTopStreamer, address indexed newTopStreamer);
+    event RenterChanged(address indexed oldRenter, address indexed newRenter);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);
@@ -162,7 +164,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.startPrank(sender);
         
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(address(0), sender);
+        emit RenterChanged(address(0), sender);
 
         vm.expectEmit(true, false, false, true);
         emit NewInboundStream(sender, flowRate);
@@ -228,7 +230,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         daix.transfer(sender2, 100 ether);
 
         vm.expectEmit(true, true, false, true);
-        emit NewTopStreamer(sender1, sender2);
+        emit RenterChanged(sender1, sender2);
 
         vm.expectEmit(true, false, false, true);
         emit NewInboundStream(sender2, secondRate);
@@ -396,7 +398,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender1);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender2, sender1);
+        emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender1, 250);
         daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
@@ -447,7 +449,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender2);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender2, sender1);
+        emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender2, 50);
         daix.updateFlow(address(app), 50, abi.encode(address(sender1), newData));
@@ -494,7 +496,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender, address(0));
+        emit RenterChanged(sender, address(0));
         vm.expectEmit(true, false, false, false);
         emit StreamTerminated(sender);
         daix.deleteFlow(sender, address(app));
@@ -534,7 +536,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender2);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender2, sender1);
+        emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, false);
         emit StreamTerminated(sender2);
         daix.deleteFlow(sender2, address(app));
@@ -727,7 +729,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender2);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender2, sender1);
+        emit RenterChanged(sender2, sender1);
         daix.deleteFlow(sender2, address(app));
 
         //// check state
@@ -758,7 +760,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender);
         vm.expectEmit(true, true, false, false);
-        emit NewTopStreamer(sender, address(0));
+        emit RenterChanged(sender, address(0));
         daix.deleteFlow(sender, address(app));
 
         //// check state
