@@ -59,7 +59,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     int96 public topFlowRate;
 
     /// @dev maps a bidder to their user data. They provide this data when placing a bid
-    mapping(address => bytes) public senderUserData;
+    mapping(address => bytes) public senderUserData; // todo
 
     // todo: maybe gas can be optimized here by packing in some uint8 in the same slot that is 1 or something
     uint8 private __gasThingy;
