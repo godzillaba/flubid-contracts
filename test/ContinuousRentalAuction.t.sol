@@ -612,6 +612,17 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // assume list is proper
     }
 
+    function testSecondPlaceHasLowBalance() external {
+        testCreateSecondStreamLarger(100, 200);
+
+        (int256 realtimeBalance,,) = daix.realtimeBalanceOf(vm.addr(1), block.timestamp);
+        vm.prank(vm.addr(1));
+        daix.transfer(address(1), uint256(realtimeBalance) - 1);
+
+        vm.prank(vm.addr(2));
+        daix.deleteFlow(vm.addr(2), address(app));
+    }
+
     /*******************************************************
      * 
      * Controller Operations

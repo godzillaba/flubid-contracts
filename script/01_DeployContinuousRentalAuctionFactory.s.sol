@@ -12,10 +12,12 @@ contract DeployContinuousRentalAuctionFactory is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address sfHost = vm.envAddress("GOERLI_SUPERFLUID_HOST");
-        address sfCfa = vm.envAddress("GOERLI_SUPERFLUID_CFA");
+        address sfHost = vm.envAddress("MUMBAI_SUPERFLUID_HOST");
+        address sfCfa = vm.envAddress("MUMBAI_SUPERFLUID_CFA");
 
-        ContinuousRentalAuctionFactory factory = new ContinuousRentalAuctionFactory(sfHost, sfCfa);
+        ContinuousRentalAuctionFactory factory = new ContinuousRentalAuctionFactory{salt: bytes32(uint256(1))}(sfHost, sfCfa);
+
+        console.log("ContinuousRentalAuctionFactory deployed to:", address(factory));
 
         vm.stopBroadcast();
     }
