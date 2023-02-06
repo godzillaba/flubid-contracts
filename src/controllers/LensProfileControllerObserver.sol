@@ -66,4 +66,8 @@ contract LensProfileControllerObserver is IRentalAuctionControllerObserver, Owna
     function post(LensDataTypes.PostData calldata postData) external onlyRenter {
         lensHub.post(postData);
     }
+
+    function metadata() external view returns (string memory) {
+        return lensHub.tokenURI(tokenId);
+    }
 }

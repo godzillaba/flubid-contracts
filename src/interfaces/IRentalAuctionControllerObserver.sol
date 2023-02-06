@@ -5,5 +5,6 @@ import { IRentalAuction } from "./IRentalAuction.sol";
 
 interface IRentalAuctionControllerObserver {
     function initialize(IRentalAuction rentalAuction, bytes calldata auxData) external;
-    function onRenterChanged(address newRenter) external; // todo: maybe call this onRenterChanged?
+    function onRenterChanged(address newRenter) external;
+    // todo metadata
 }
