@@ -28,12 +28,12 @@ import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperToke
 // import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
-import { LensProfileRentalAuctionControllerObserver } from "../src/controllers/LensProfileRentalAuctionControllerObserver.sol";
+import { LensProfileControllerObserver } from "../src/controllers/LensProfileControllerObserver.sol";
 import { ILensHub } from "../src/interfaces/ILensHub.sol";
 import { LensDataTypes } from "../src/libraries/LensDataTypes.sol";
 
 
-contract LensProfileRentalAuctionControllerObserverTest is Test, IRentalAuction {
+contract LensProfileControllerObserverTest is Test, IRentalAuction {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
@@ -45,7 +45,7 @@ contract LensProfileRentalAuctionControllerObserverTest is Test, IRentalAuction 
 
     address constant profileCreationProxy = 0x420f0257D43145bb002E69B14FF2Eb9630Fc4736;
 
-    LensProfileRentalAuctionControllerObserver controller;
+    LensProfileControllerObserver controller;
 
     address public currentRenter;
     uint256 profileId;
@@ -65,7 +65,7 @@ contract LensProfileRentalAuctionControllerObserverTest is Test, IRentalAuction 
     event AuctionStopped();
 
     function setUp() external {
-        controller = new LensProfileRentalAuctionControllerObserver();
+        controller = new LensProfileControllerObserver();
 
         string memory handle = "oiqfwefiow";
 

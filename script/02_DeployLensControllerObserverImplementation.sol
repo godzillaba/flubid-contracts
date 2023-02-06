@@ -7,7 +7,7 @@ import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interface
 
 import { ILensHub } from "../src/interfaces/ILensHub.sol";
 
-import { LensProfileRentalAuctionControllerObserver } from "../src/controllers/LensProfileRentalAuctionControllerObserver.sol";
+import { LensProfileControllerObserver } from "../src/controllers/LensProfileControllerObserver.sol";
 
 contract DeployLensControllerObserverImplementation is Script {
     function setUp() public {}
@@ -17,7 +17,7 @@ contract DeployLensControllerObserverImplementation is Script {
         
         vm.startBroadcast(privateKey);
 
-        LensProfileRentalAuctionControllerObserver controllerImpl = new LensProfileRentalAuctionControllerObserver{salt: bytes32(uint256(1))}();
+        LensProfileControllerObserver controllerImpl = new LensProfileControllerObserver{salt: bytes32(uint256(1))}();
 
         console.log("Lens controller implementation deployed to:", address(controllerImpl));
         

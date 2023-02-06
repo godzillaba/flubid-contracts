@@ -10,7 +10,7 @@ import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 // vitalik 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
 // ens 0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85
 
-contract ENSRentalAuctionControllerObserver is IRentalAuctionControllerObserver, Initializable {
+contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializable {
     IBaseRegistrar constant ensRegistrar = IBaseRegistrar(0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85);
 
     IRentalAuction rentalAuction;

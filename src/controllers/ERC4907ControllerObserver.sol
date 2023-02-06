@@ -8,7 +8,7 @@ import { IERC4907 } from "../interfaces/IERC4907.sol";
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
-contract ERC4907RentalAuctionControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
+contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
     IERC4907 public tokenContract;
     uint256 public tokenId;
 

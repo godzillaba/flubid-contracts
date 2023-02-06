@@ -9,7 +9,7 @@ import { LensDataTypes } from "../libraries/LensDataTypes.sol";
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
-contract LensProfileRentalAuctionControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
+contract LensProfileControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
     ILensHub constant lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
     uint256 public tokenId;
 
