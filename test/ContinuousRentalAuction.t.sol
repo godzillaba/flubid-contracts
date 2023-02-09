@@ -106,9 +106,12 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.initialize(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
     }
 
-    function tokenURI() external view override returns (string memory) {}
+    function underlyingTokenContract() external view override returns (address) {}
 
-    function tokenName() external view override returns (string memory) {}
+    function underlyingTokenID() external view override returns (uint256) {}
+
+    function startAuction() external view override {}
+    function stopAuction() external view override {}
 
     function onRenterChanged(address newRenter) public {
         reportedRenter = newRenter;

@@ -5,13 +5,12 @@ import "forge-std/Script.sol";
 import { ContinuousRentalAuctionFactory } from "../src/factories/ContinuousRentalAuctionFactory.sol";
 import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 
-import { ILensHub } from "../src/interfaces/ILensHub.sol";
 
 contract CreateContinuousLensAuction is Script {
     ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x7333098d87a4823c821f9BA7F6e200F9001B3BA7);
-    ILensHub lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
 
-    address lensControllerObserverImpl = 0x86A0Efd6076Ae14306cA14C1953a689A36070e17;
+    address erc4907ControllerObserverImpl = 0x8a92528cCfbdFB6cCfa982e936E844a56D9D47ba;
+    address erc4907 = 0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B;
 
     uint256 minimumBidFactorWad = 1.05 ether;
     int96 reserveRate = 10;
@@ -30,11 +29,11 @@ contract CreateContinuousLensAuction is Script {
 
         (address auction, address controller) = factory.create({
             _acceptedToken: maticx,
-            _controllerObserverImplementation: lensControllerObserverImpl,
+            _controllerObserverImplementation: erc4907ControllerObserverImpl,
             _beneficiary: account,
             _minimumBidFactorWad: uint96(minimumBidFactorWad),
             _reserveRate: reserveRate,
-            _controllerObserverExtraArgs: abi.encode(tokenId)
+            _controllerObserverExtraArgs: abi.encode(erc4907, tokenId)
         });
 
         console.log("Auction deployed to:", auction);

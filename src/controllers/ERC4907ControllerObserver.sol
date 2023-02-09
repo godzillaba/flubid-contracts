@@ -59,10 +59,10 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
         emit AuctionStarted();
     }
 
-    function tokenURI() external view returns (string memory) {
-        return tokenContract.tokenURI(tokenId);
+    function underlyingTokenContract() external view returns (address) {
+        return address(tokenContract);
     }
-    function tokenName() external view returns (string memory) {
-        return tokenContract.name();
+    function underlyingTokenID() external view returns (uint256) {
+        return tokenId;
     }
 }

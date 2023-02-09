@@ -79,7 +79,7 @@ contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializabl
         }
     }
 
-    function tokenURI() external view override returns (string memory) {}
+    function underlyingTokenContract() external view override returns (address) {} // todo
 
-    function tokenName() external view override returns (string memory) {}
+    function underlyingTokenID() external view override returns (uint256) {} // todo
 }

@@ -67,11 +67,11 @@ contract LensProfileControllerObserver is IRentalAuctionControllerObserver, Owna
         lensHub.post(postData);
     }
 
-    function tokenURI() external view returns (string memory) {
-        return lensHub.tokenURI(tokenId);
+    function underlyingTokenContract() external pure returns (address) {
+        return address(lensHub);
     }
 
-    function tokenName() external view returns (string memory) {
-        return lensHub.name();
+    function underlyingTokenID() external view returns (uint256) {
+        return tokenId;
     }
 }

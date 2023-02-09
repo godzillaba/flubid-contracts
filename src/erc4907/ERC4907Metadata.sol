@@ -81,6 +81,10 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
         }
     }
 
+    function mint(uint256 tokenId) external {
+        _mint(msg.sender, tokenId);
+    }
+
     function name() public view override(ERC721, IERC4907Metadata) returns (string memory) {
         return super.name();
     }
@@ -88,16 +92,20 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
     function symbol() public view override(ERC721, IERC4907Metadata) returns (string memory) {
         return super.symbol();
     }
-
-    function tokenURI(uint256 tokenId) public view override(ERC721, IERC4907Metadata) returns (string memory) {
-        ownerOf(tokenId); // reverts if tokenId is invalid
-        return string(abi.encodePacked(baseURI, intToString(tokenId)));
+    
+    function tokenURI(uint256) public view override(ERC721, IERC4907Metadata) returns (string memory) {
+        return baseURI;
     }
 
-    function intToString(uint256 x) private pure returns (string memory result) {
-        while (x > 0) {
-            result = string(abi.encodePacked(result, string(abi.encodePacked(x % 10 + 48))));
-            x /= 10;
-        }
-    }
+    // function tokenURI(uint256 tokenId) public view override(ERC721, IERC4907Metadata) returns (string memory) {
+    //     ownerOf(tokenId); // reverts if tokenId is invalid
+    //     return string(abi.encodePacked(baseURI, intToString(tokenId)));
+    // }
+
+    // function intToString(uint256 x) private pure returns (string memory result) {
+    //     while (x > 0) {
+    //         result = string(abi.encodePacked(result, string(abi.encodePacked(x % 10 + 48))));
+    //         x /= 10;
+    //     }
+    // }
 } 
