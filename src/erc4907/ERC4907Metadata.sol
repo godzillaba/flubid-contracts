@@ -5,6 +5,7 @@ import { IERC4907, IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 import { ERC721 } from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 import { IERC165 } from "openzeppelin-contracts/interfaces/IERC165.sol";
+import { IERC721Metadata } from "openzeppelin-contracts/interfaces/IERC721Metadata.sol";
 
 // https://eips.ethereum.org/EIPS/eip-4907
 
@@ -17,7 +18,11 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
 
     mapping (uint256  => UserInfo) internal _users;
 
-    constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
+    string public baseURI;
+
+    constructor(string memory name_, string memory symbol_, string memory _baseURI) ERC721(name_, symbol_) {
+        baseURI = _baseURI;
+    }
     
     /// @notice set the user and expires of an NFT
     /// @dev The zero address indicates there is no user
@@ -58,6 +63,7 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
         return 
             interfaceId == type(IERC4907).interfaceId 
             || interfaceId == type(IERC4907Metadata).interfaceId
+            || interfaceId == type(IERC721Metadata).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
@@ -84,6 +90,14 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
     }
 
     function tokenURI(uint256 tokenId) public view override(ERC721, IERC4907Metadata) returns (string memory) {
-        return "";
+        ownerOf(tokenId); // reverts if tokenId is invalid
+        return string(abi.encodePacked(baseURI, intToString(tokenId)));
+    }
+
+    function intToString(uint256 x) private pure returns (string memory result) {
+        while (x > 0) {
+            result = string(abi.encodePacked(result, string(abi.encodePacked(x % 10 + 48))));
+            x /= 10;
+        }
     }
 } 
