@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "openzeppelin-contracts/interfaces/IERC721.sol";
+import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 
 interface IERC4907 is IERC721 {
     // from https://eips.ethereum.org/EIPS/eip-4907
@@ -29,4 +29,10 @@ interface IERC4907 is IERC721 {
     /// @param tokenId The NFT to get the user expires for
     /// @return The user expires for this NFT
     function userExpires(uint256 tokenId) external view returns(uint256);
+}
+
+interface IERC4907Metadata is IERC4907 {
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function tokenURI(uint256 tokenId) external view returns (string memory);
 }

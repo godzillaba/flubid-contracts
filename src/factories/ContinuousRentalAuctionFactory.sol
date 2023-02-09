@@ -26,12 +26,8 @@ contract ContinuousRentalAuctionFactory {
 
     event ContinuousRentalAuctionDeployed(
         address indexed auctionAddress, 
-        address indexed controllerObserverAddress
-    );
-    event RentalAuctionControllerObserverDeployed(
-        address indexed controllerObserverImplementation, 
-        address indexed controllerObserverAddress, 
-        address indexed auctionAddress
+        address indexed controllerObserverAddress,
+        address indexed controllerObserverImplementation
     );
 
     constructor(address _host, address _cfa) {
@@ -41,7 +37,7 @@ contract ContinuousRentalAuctionFactory {
         cfa = _cfa;
     }
 
-    function createContinuousRentalAuctionWithController(
+    function create(
         ISuperToken _acceptedToken,
         address _controllerObserverImplementation,
         address _beneficiary,
@@ -71,28 +67,6 @@ contract ContinuousRentalAuctionFactory {
             _controllerObserverExtraArgs
         );
 
-        emit ContinuousRentalAuctionDeployed(auctionClone, controllerObserverClone);
-        emit RentalAuctionControllerObserverDeployed(_controllerObserverImplementation, controllerObserverClone, auctionClone);
-    }
-
-    function createContinuousRentalAuctionNoController(
-        ISuperToken _acceptedToken,
-        address _beneficiary,
-        uint96 _minimumBidFactorWad,
-        int96 _reserveRate
-    ) external returns (address auctionClone) {
-        auctionClone = Clones.clone(implementation);
-
-        ContinuousRentalAuction(auctionClone).initialize(
-            _acceptedToken, 
-            ISuperfluid(host), 
-            IConstantFlowAgreementV1(cfa), 
-            IRentalAuctionControllerObserver(address(0)), 
-            _beneficiary, 
-            _minimumBidFactorWad, 
-            _reserveRate
-        );
-
-        emit ContinuousRentalAuctionDeployed(auctionClone, address(0));
+        emit ContinuousRentalAuctionDeployed(auctionClone, controllerObserverClone, _controllerObserverImplementation);
     }
 }

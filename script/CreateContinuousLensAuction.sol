@@ -8,8 +8,10 @@ import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interface
 import { ILensHub } from "../src/interfaces/ILensHub.sol";
 
 contract CreateContinuousLensAuction is Script {
-    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x70748EFAff42d57b45BAd846160de2B23285Cf29);
-    ILensHub constant lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
+    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0xe85CdF837c6b7Ab1B610ff63D06C20c324167564);
+    ILensHub lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
+
+    address lensControllerObserverImpl = 0x68030b6C828e5e512774B24d8889914cCbc85736;
 
     uint256 minimumBidFactorWad = 1.05 ether;
     int96 reserveRate = 10;
@@ -26,9 +28,9 @@ contract CreateContinuousLensAuction is Script {
         
         vm.startBroadcast(privateKey);
 
-        (address auction, address controller) = factory.createContinuousRentalAuctionWithController({
+        (address auction, address controller) = factory.create({
             _acceptedToken: maticx,
-            _controllerObserverImplementation: 0x41664AdD9a2e371a788E84a8B5A1afAeB823e07B,
+            _controllerObserverImplementation: lensControllerObserverImpl,
             _beneficiary: account,
             _minimumBidFactorWad: uint96(minimumBidFactorWad),
             _reserveRate: reserveRate,

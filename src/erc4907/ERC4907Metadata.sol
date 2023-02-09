@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { IERC4907 } from "../interfaces/IERC4907.sol";
+import { IERC4907, IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 import { ERC721 } from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 import { IERC165 } from "openzeppelin-contracts/interfaces/IERC165.sol";
 
 // https://eips.ethereum.org/EIPS/eip-4907
 
-contract ERC4907 is IERC4907, ERC721 {
+contract ERC4907Metadata is ERC721, IERC4907Metadata {
     struct UserInfo 
     {
         address user;   // address of user role
@@ -54,8 +54,11 @@ contract ERC4907 is IERC4907, ERC721 {
     }
 
     /// @dev See {IERC165-supportsInterface}.
-    function supportsInterface(bytes4 interfaceId) public view override(ERC721, IERC165) returns (bool) {
-        return interfaceId == type(IERC4907).interfaceId || super.supportsInterface(interfaceId);
+    function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, IERC165) returns (bool) {
+        return 
+            interfaceId == type(IERC4907).interfaceId 
+            || interfaceId == type(IERC4907Metadata).interfaceId
+            || super.supportsInterface(interfaceId);
     }
 
     function _beforeTokenTransfer(
@@ -70,5 +73,17 @@ contract ERC4907 is IERC4907, ERC721 {
             delete _users[tokenId];
             emit UpdateUser(tokenId, address(0), 0);
         }
+    }
+
+    function name() public view override(ERC721, IERC4907Metadata) returns (string memory) {
+        return super.name();
+    }
+
+    function symbol() public view override(ERC721, IERC4907Metadata) returns (string memory) {
+        return super.symbol();
+    }
+
+    function tokenURI(uint256 tokenId) public view override(ERC721, IERC4907Metadata) returns (string memory) {
+        return "";
     }
 } 

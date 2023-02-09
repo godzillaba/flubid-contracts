@@ -90,6 +90,14 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     int96 public reserveRate;
 
+    event Initialized(
+        address indexed acceptedToken, 
+        address indexed controllerObserver, 
+        address indexed beneficiary,
+        uint96 minimumBidFactorWad,
+        int96 reserveRate
+    );
+
     event RenterChanged(address indexed oldRenter, address indexed newRenter);
     event NewInboundStream(address indexed streamer, int96 flowRate);
     event StreamUpdated(address indexed streamer, int96 flowRate);
@@ -140,6 +148,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         beneficiary = _beneficiary;
         minimumBidFactorWad = _minimumBidFactorWad;
         reserveRate = _reserveRate;
+        
+        emit Initialized(address(_acceptedToken), address(_controllerObserver), _beneficiary, _minimumBidFactorWad, _reserveRate);
     }
 
     modifier onlyHost() {

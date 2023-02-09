@@ -78,4 +78,8 @@ contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializabl
             _setENSNameController(topStreamer);
         }
     }
+
+    function tokenURI() external view override returns (string memory) {}
+
+    function tokenName() external view override returns (string memory) {}
 }

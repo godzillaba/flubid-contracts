@@ -3,13 +3,13 @@ pragma solidity ^0.8.13;
 
 import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-import { IERC4907 } from "../interfaces/IERC4907.sol";
+import { IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
 contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
-    IERC4907 public tokenContract;
+    IERC4907Metadata public tokenContract;
     uint256 public tokenId;
 
     IRentalAuction public rentalAuction; 
@@ -25,7 +25,7 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
         __Ownable_init();
 
         rentalAuction = _rentalAuction;
-        (tokenContract, tokenId) = abi.decode(extraArgs, (IERC4907, uint256));
+        (tokenContract, tokenId) = abi.decode(extraArgs, (IERC4907Metadata, uint256));
 
         _rentalAuction.pause(); // pause the auction because we need to get the nft in here first
     }
@@ -57,5 +57,12 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
         tokenContract.transferFrom(owner(), address(this), tokenId);
 
         emit AuctionStarted();
+    }
+
+    function tokenURI() external view returns (string memory) {
+        return tokenContract.tokenURI(tokenId);
+    }
+    function tokenName() external view returns (string memory) {
+        return tokenContract.name();
     }
 }
