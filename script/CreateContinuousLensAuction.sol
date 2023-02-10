@@ -8,10 +8,10 @@ import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interface
 import { ILensHub } from "../src/interfaces/ILensHub.sol";
 
 contract CreateContinuousLensAuction is Script {
-    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x7333098d87a4823c821f9BA7F6e200F9001B3BA7);
+    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x232BbC02b5FF8bFc94CB9b7163F58f8bF82E6AfD);
     ILensHub lensHub = ILensHub(0x60Ae865ee4C725cd04353b5AAb364553f56ceF82);
 
-    address lensControllerObserverImpl = 0x86A0Efd6076Ae14306cA14C1953a689A36070e17;
+    address lensControllerObserverImpl = 0x11bc64F68fBe2899b581f7DEEf204d49BA445957;
 
     uint256 minimumBidFactorWad = 1.05 ether;
     int96 reserveRate = 10;

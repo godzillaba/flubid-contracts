@@ -7,9 +7,9 @@ import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interface
 
 
 contract CreateContinuousLensAuction is Script {
-    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x7333098d87a4823c821f9BA7F6e200F9001B3BA7);
+    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x232BbC02b5FF8bFc94CB9b7163F58f8bF82E6AfD);
 
-    address erc4907ControllerObserverImpl = 0x8a92528cCfbdFB6cCfa982e936E844a56D9D47ba;
+    address erc4907ControllerObserverImpl = 0xbDb5baeb476AeE7904441039e1F712d7DDD88A56;
     address erc4907 = 0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B;
 
     uint256 minimumBidFactorWad = 1.05 ether;

@@ -117,7 +117,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         reportedRenter = newRenter;
     }
 
-    function initialize(IRentalAuction, bytes calldata) external {}
+    function initialize(IRentalAuction, address, bytes calldata) external {}
 
     function testNoDuplicateStreams() public {
         address sender = vm.addr(1);

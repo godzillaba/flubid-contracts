@@ -74,6 +74,7 @@ contract LensProfileControllerObserverTest is Test, IRentalAuction {
         vm.prank(profileHolder);
         controller.initialize(
             IRentalAuction(this),
+            profileHolder,
             abi.encode(profileId)
         );
     }
@@ -119,10 +120,10 @@ contract LensProfileControllerObserverTest is Test, IRentalAuction {
     function testOnlyOwner() external {
         vm.startPrank(vm.addr(1));
         
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
         controller.stopAuction();
 
-        vm.expectRevert("Ownable: caller is not the owner");
+        vm.expectRevert(bytes4(keccak256("Unauthorized()")));
         controller.startAuction();
 
         vm.stopPrank();

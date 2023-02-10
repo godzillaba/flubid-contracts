@@ -23,9 +23,10 @@ contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializabl
 
     error ENSNameNotOwned();
 
-    function initialize(IRentalAuction _rentalAuction, bytes calldata extraArgs) external initializer {
+    function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata extraArgs) external initializer {
+        owner = _owner;
         rentalAuction = _rentalAuction;
-        (ensTokenId, owner) = abi.decode(extraArgs, (uint256, address));
+        (ensTokenId) = abi.decode(extraArgs, (uint256));
     }
 
     modifier onlyRentalAuction {

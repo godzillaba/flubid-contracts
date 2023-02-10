@@ -124,7 +124,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function startAuction() external view override {}
     function stopAuction() external view override {}
 
-    function initialize(IRentalAuction, bytes calldata) external view {}
+    function initialize(IRentalAuction, address, bytes calldata) external view {}
 
     function createERC20ApprovalOperation() private view returns (ISuperfluid.Operation memory op) {
         op.operationType = BatchOperation.OPERATION_TYPE_ERC20_APPROVE;

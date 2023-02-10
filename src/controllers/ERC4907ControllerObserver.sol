@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 import { IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 
-contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableUpgradeable {
+contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, Initializable {
     IERC4907Metadata public tokenContract;
     uint256 public tokenId;
 
     IRentalAuction public rentalAuction; 
+
+    address public owner; // todo transferOwnership
 
     event AuctionStopped();
     event AuctionStarted();
@@ -21,9 +23,8 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
 
     error TokenNotOwned();
 
-    function initialize(IRentalAuction _rentalAuction, bytes calldata extraArgs) public initializer {
-        __Ownable_init();
-
+    function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata extraArgs) public initializer {
+        owner = _owner;
         rentalAuction = _rentalAuction;
         (tokenContract, tokenId) = abi.decode(extraArgs, (IERC4907Metadata, uint256));
 
@@ -32,6 +33,11 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
 
     modifier onlyRentalAuction {
         if (msg.sender != address(rentalAuction)) revert Unauthorized();
+        _;
+    }
+
+    modifier onlyOwner {
+        if (msg.sender != owner) revert Unauthorized();
         _;
     }
 
@@ -44,7 +50,7 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
         rentalAuction.pause();
 
         // send back the nft
-        tokenContract.transferFrom(address(this), owner(), tokenId);
+        tokenContract.transferFrom(address(this), owner, tokenId);
 
         emit AuctionStopped();
     }
@@ -54,7 +60,7 @@ contract ERC4907ControllerObserver is IRentalAuctionControllerObserver, OwnableU
         rentalAuction.unpause();
 
         // pull in the nft
-        tokenContract.transferFrom(owner(), address(this), tokenId);
+        tokenContract.transferFrom(owner, address(this), tokenId);
 
         emit AuctionStarted();
     }

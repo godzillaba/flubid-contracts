@@ -64,6 +64,7 @@ contract ContinuousRentalAuctionFactory {
 
         IRentalAuctionControllerObserver(controllerObserverClone).initialize(
             IRentalAuction(auctionClone),
+            msg.sender,
             _controllerObserverExtraArgs
         );
 

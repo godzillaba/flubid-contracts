@@ -7,7 +7,7 @@ import {IRentalAuctionControllerObserver} from "../src/interfaces/IRentalAuction
 import {IERC721} from "openzeppelin-contracts/interfaces/IERC721.sol";
 
 contract StartERC4907RentalAuction is Script {
-    IRentalAuctionControllerObserver controller = IRentalAuctionControllerObserver(0xA9C9Ec72620a2CcaD53511446B88faC469a151a5);
+    IRentalAuctionControllerObserver controller = IRentalAuctionControllerObserver(0xb9D8a5dbfb87dE415963938636B5Bb5B984B29E2);
     IERC721 nft = IERC721(0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B);
 
     function setUp() external {}
