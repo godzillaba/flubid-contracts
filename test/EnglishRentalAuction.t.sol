@@ -59,11 +59,11 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     int96 reserveRate = 5;
 
-    uint256 minRentalDuration = 1 days;
-    uint256 maxRentalDuration = 7 days;
+    uint64 minRentalDuration = 1 days;
+    uint64 maxRentalDuration = 7 days;
 
-    uint256 biddingPhaseDuration = 1 days;
-    uint256 biddingPhaseExtensionDuration = 2 hours;
+    uint64 biddingPhaseDuration = 1 days;
+    uint64 biddingPhaseExtensionDuration = 2 hours;
 
     address reportedRenter;
 
@@ -193,7 +193,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     function testSuccessfulBid(int96 flowRate) public {
         vm.assume(flowRate >= reserveRate);
-        vm.assume(uint96(flowRate) * minRentalDuration < 0.5 ether);
+        vm.assume(uint96(flowRate) * uint256(minRentalDuration) < 0.5 ether);
 
         address user = vm.addr(1);
 
@@ -212,7 +212,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(app.currentPhaseEndTime(), block.timestamp + biddingPhaseDuration);
 
         // verify daix balances
-        uint256 depositSize = minRentalDuration * uint96(flowRate);
+        uint256 depositSize = uint256(minRentalDuration) * uint96(flowRate);
         assertEq(daix.balanceOf(address(app)), depositSize);
         assertEq(daix.balanceOf(user), 1 ether - depositSize);
 
@@ -225,15 +225,15 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(reportedRenter, reportedRenterPlaceholder);
     }
     
-    // TODO
-    // function testSecondBidTooLow(int32 flowRate1, int32 flowRate2) public {
+    // // TODO
+    // // function testSecondBidTooLow(int32 flowRate1, int32 flowRate2) public {
 
-    // }
+    // // }
 
     function testSecondBid(int32 flowRate1, int32 flowRate2) public {
         vm.assume(flowRate1 >= reserveRate);
-        vm.assume(uint32(flowRate1) * minRentalDuration < 0.5 ether);
-        vm.assume(uint32(flowRate2) * minRentalDuration < 0.5 ether);
+        vm.assume(uint32(flowRate1) * uint256(minRentalDuration) < 0.5 ether);
+        vm.assume(uint32(flowRate2) * uint256(minRentalDuration) < 0.5 ether);
         vm.assume(flowRate2 > 0 && app.isBidHigher(flowRate2, flowRate1));
 
         address bidder1 = vm.addr(1);
@@ -260,7 +260,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(app.currentPhaseEndTime(), firstBidTs + biddingPhaseDuration);
 
         // verify daix balances
-        uint256 depositSize = minRentalDuration * uint32(flowRate2);
+        uint256 depositSize = uint256(minRentalDuration) * uint32(flowRate2);
         assertEq(daix.balanceOf(address(app)), depositSize);
         assertEq(daix.balanceOf(bidder1), 1 ether);
         assertEq(daix.balanceOf(bidder2), 1 ether - depositSize);
@@ -279,8 +279,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // test second bid is close to the end of the bidding phase, so it gets extended
 
         vm.assume(flowRate1 >= reserveRate);
-        vm.assume(uint32(flowRate1) * minRentalDuration < 0.5 ether);
-        vm.assume(uint32(flowRate2) * minRentalDuration < 0.5 ether);
+        vm.assume(uint32(flowRate1) * uint256(minRentalDuration) < 0.5 ether);
+        vm.assume(uint32(flowRate2) * uint256(minRentalDuration) < 0.5 ether);
         vm.assume(flowRate2 > 0 && app.isBidHigher(flowRate2, flowRate1));
 
         address bidder1 = vm.addr(1);
@@ -307,7 +307,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(app.currentPhaseEndTime(), secondBidTs + biddingPhaseExtensionDuration);
 
         // verify daix balances
-        uint256 depositSize = minRentalDuration * uint32(flowRate2);
+        uint256 depositSize = uint256(minRentalDuration) * uint32(flowRate2);
         assertEq(daix.balanceOf(address(app)), depositSize);
         assertEq(daix.balanceOf(bidder1), 1 ether);
         assertEq(daix.balanceOf(bidder2), 1 ether - depositSize);
@@ -345,7 +345,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(app.currentPhaseEndTime(), block.timestamp + maxRentalDuration);
 
         // verify daix balances
-        uint256 depositSize = minRentalDuration * uint96(flowRate);
+        uint256 depositSize = uint256(minRentalDuration) * uint96(flowRate);
         assertEq(daix.balanceOf(address(app)), depositSize);
 
         // verify streams
@@ -358,7 +358,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     function testTransitionToBiddingPhase(int96 flowRate) public {
-        vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
+        vm.assume(uint96(flowRate) * uint256(maxRentalDuration) < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testTransitionToRentalPhase(flowRate);
 
@@ -397,11 +397,11 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     function testRenterTerminateStreamAfterMinimumDuration(int32 _flowRate, uint32 duration) public {
-        // renter terminates their stream before the maxRentalDuration has elapsed but after the minRentalDuration has elapsed
+        // renter terminates their stream before the maxRentalDuration has elapsed but after the uint256(minRentalDuration) has elapsed
         int96 flowRate = int96(_flowRate);
 
-        vm.assume(duration >= minRentalDuration && duration < maxRentalDuration * 3 / 2);
-        vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
+        vm.assume(duration >= uint256(minRentalDuration) && duration < maxRentalDuration * 3 / 2);
+        vm.assume(uint96(flowRate) * uint256(maxRentalDuration) < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testTransitionToRentalPhase(flowRate);
 
@@ -447,11 +447,11 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     function testRenterTerminateStreamBeforeMinimumDuration(int32 _flowRate, uint32 duration) public {
-        // renter terminates their stream before the minRentalDuration has elapsed
+        // renter terminates their stream before the uint256(minRentalDuration) has elapsed
         int96 flowRate = int96(int32(_flowRate));
 
-        vm.assume(duration < minRentalDuration);
-        vm.assume(uint96(flowRate) * maxRentalDuration < 0.5 ether); // flow is small enough that they can pay for the entire duration
+        vm.assume(duration < uint256(minRentalDuration));
+        vm.assume(uint96(flowRate) * uint256(maxRentalDuration) < 0.5 ether); // flow is small enough that they can pay for the entire duration
 
         testTransitionToRentalPhase(flowRate);
 
@@ -482,7 +482,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(app.currentPhaseEndTime(), 0);
 
         // verify daix balances
-        uint256 depositSize = uint96(flowRate) * minRentalDuration;
+        uint256 depositSize = uint96(flowRate) * uint256(minRentalDuration);
         assertEq(daix.balanceOf(address(app)), 0);
         assertEq(daix.balanceOf(beneficiary), depositSize);
         assertEq(daix.balanceOf(renter), 1 ether - depositSize);
@@ -513,13 +513,13 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectRevert(bytes4(keccak256("TooEarlyToReclaimDeposit()")));
         app.reclaimDeposit();
 
-        vm.warp(rentalStartTs + minRentalDuration - 1);
+        vm.warp(rentalStartTs + uint256(minRentalDuration) - 1);
 
         vm.prank(renter);
         vm.expectRevert(bytes4(keccak256("TooEarlyToReclaimDeposit()")));
         app.reclaimDeposit();
 
-        vm.warp(rentalStartTs + minRentalDuration);
+        vm.warp(rentalStartTs + uint256(minRentalDuration));
 
         vm.prank(renter);
         app.reclaimDeposit();

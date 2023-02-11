@@ -26,6 +26,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * Constants
      * 
      *******************************************************/
+    uint256 constant _wad = 1e18;
 
     ISuperToken public acceptedToken;
     ISuperfluid public host;
@@ -38,16 +39,15 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     int96 public reserveRate;
 
     uint256 public minimumBidFactorWad;
-    uint256 constant _wad = 1e18;
 
-    uint256 public minRentalDuration;
-    uint256 public maxRentalDuration;
+    uint64 public minRentalDuration;
+    uint64 public maxRentalDuration;
 
     // The duration of the bidding phase once the first bid has been placed
-    uint256 public biddingPhaseDuration;
+    uint64 public biddingPhaseDuration;
 
     // The duration by which the bidding phase is extended if there is a bid placed with less than `biddingPhaseExtensionDuration` time left in the bidding phase
-    uint256 public biddingPhaseExtensionDuration;
+    uint64 public biddingPhaseExtensionDuration;
 
     /*******************************************************
      * 
@@ -138,10 +138,10 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         address _beneficiary,
         uint96 _minimumBidFactorWad,
         int96 _reserveRate,
-        uint256 _minRentalDuration,
-        uint256 _maxRentalDuration, // TODO: better name for this
-        uint256 _biddingPhaseDuration,
-        uint256 _biddingPhaseExtensionDuration
+        uint64 _minRentalDuration,
+        uint64 _maxRentalDuration, // TODO: better name for this
+        uint64 _biddingPhaseDuration,
+        uint64 _biddingPhaseExtensionDuration
     ) external initializer {
         require(address(_acceptedToken) != address(0));
         require(address(_host) != address(0));
@@ -251,12 +251,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         }
 
         // take deposit from new bidder
-        uint256 depositSize = uint96(flowRate) * minRentalDuration;
+        uint256 depositSize = uint96(flowRate) * uint256(minRentalDuration);
         acceptedToken.transferFrom(msgSender, address(this), depositSize);
 
         // return the deposit of the last bidder (if there is one)
         if (oldTopFlowRate != 0) {
-            acceptedToken.transfer(oldTopBidder, uint96(oldTopFlowRate) * minRentalDuration);
+            acceptedToken.transfer(oldTopBidder, uint96(oldTopFlowRate) * uint256(minRentalDuration));
         }
 
         emit NewTopBid(msgSender, flowRate);
@@ -291,7 +291,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         if (block.timestamp < rentalStartTs + minRentalDuration) revert TooEarlyToReclaimDeposit();
 
         depositClaimed = true;
-        uint256 depositSize = uint96(topFlowRate) * minRentalDuration;
+        uint256 depositSize = uint96(topFlowRate) * uint256(minRentalDuration);
 
         acceptedToken.transfer(_topBidder, depositSize);
 
@@ -367,7 +367,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         }
         catch {
             // send their deposit to beneficiary
-            acceptedToken.transfer(beneficiary, uint96(_topFlowRate) * minRentalDuration);
+            acceptedToken.transfer(beneficiary, uint96(_topFlowRate) * uint256(minRentalDuration));
 
             // restart bidding phase
             topFlowRate = 0;
@@ -389,7 +389,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // return deposit (not reentrant)
         if (!depositClaimed) {
-            acceptedToken.transfer(topBidder, uint96(topFlowRate) * minRentalDuration); 
+            acceptedToken.transfer(topBidder, uint96(topFlowRate) * uint256(minRentalDuration)); 
         }
 
         // set state variables for beginning of bidding phase
@@ -485,7 +485,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             // return deposit (or part of it)
             if (!depositClaimed) {
                 uint256 streamedAmount = uint96(_topFlowRate) * (block.timestamp + maxRentalDuration - currentPhaseEndTime );
-                uint256 depositSize = uint96(_topFlowRate) * minRentalDuration;
+                uint256 depositSize = uint96(_topFlowRate) * uint256(minRentalDuration);
 
                 if (streamedAmount >= depositSize) {
                     // not reentrant
@@ -523,7 +523,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         // refund any deposit
         if (_topFlowRate > 0) {
-            acceptedToken.transfer(_topBidder, uint96(_topFlowRate) * minRentalDuration);
+            acceptedToken.transfer(_topBidder, uint96(_topFlowRate) * uint256(minRentalDuration));
         }
 
         // set state variables to be beginning of bidding phase
