@@ -129,6 +129,17 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     error Unknown();
 
+    event Initialized(
+        address acceptedToken, 
+        address controllerObserver, 
+        address beneficiary,
+        uint96 minimumBidFactorWad,
+        int96 reserveRate,
+        uint64 minRentalDuration,
+        uint64 maxRentalDuration,
+        uint64 biddingPhaseDuration,
+        uint64 biddingPhaseExtensionDuration
+    );
 
     function initialize(
         ISuperToken _acceptedToken,
@@ -180,6 +191,18 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         __gasThingy = 1;
         isBiddingPhase = true;
+
+        emit Initialized(
+            address(_acceptedToken), 
+            address(_controllerObserver), 
+            _beneficiary,
+            _minimumBidFactorWad,
+            _reserveRate,
+            _minRentalDuration,
+            _maxRentalDuration,
+            _biddingPhaseDuration,
+            _biddingPhaseExtensionDuration
+        );
     }
 
     modifier onlyHost() {

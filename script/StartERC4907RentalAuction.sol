@@ -4,11 +4,11 @@ pragma solidity ^0.8.13;
 import "forge-std/Script.sol";
 
 import {IRentalAuctionControllerObserver} from "../src/interfaces/IRentalAuctionControllerObserver.sol";
-import {IERC721} from "openzeppelin-contracts/interfaces/IERC721.sol";
+import {ERC4907Metadata} from "../src/erc4907/ERC4907Metadata.sol";
 
 contract StartERC4907RentalAuction is Script {
-    IRentalAuctionControllerObserver controller = IRentalAuctionControllerObserver(0xb9D8a5dbfb87dE415963938636B5Bb5B984B29E2);
-    IERC721 nft = IERC721(0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B);
+    IRentalAuctionControllerObserver controller = IRentalAuctionControllerObserver(0xe04b15C246F9102e9198d6a255dD614d2Ac03f46);
+    ERC4907Metadata nft = ERC4907Metadata(0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B);
 
     function setUp() external {}
 
@@ -17,7 +17,9 @@ contract StartERC4907RentalAuction is Script {
         
         vm.startBroadcast(privateKey);
 
-        nft.approve(address(controller), 1);
+        nft.mint(3);
+
+        nft.approve(address(controller), 3);
         controller.startAuction();
 
         vm.stopBroadcast();

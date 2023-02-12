@@ -8,7 +8,7 @@ import "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 
 contract CreateStream is Script {
     using SuperTokenV1Library for ISuperToken;
-    address recipient = 0x712A80A88C75668755394225D1c5564AbE71099d;
+    address recipient = 0xeAd6453eC437702bEb5f26Dcb5575D4c2e308B72;
     ISuperToken maticx = ISuperToken(0x96B82B65ACF7072eFEb00502F45757F254c2a0D4);
 
     function setUp() external {}

@@ -6,7 +6,7 @@ import { ContinuousRentalAuctionFactory } from "../src/factories/ContinuousRenta
 import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 
 
-contract CreateContinuousLensAuction is Script {
+contract CreateContinuousERC4907Auction is Script {
     ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x232BbC02b5FF8bFc94CB9b7163F58f8bF82E6AfD);
 
     address erc4907ControllerObserverImpl = 0xbDb5baeb476AeE7904441039e1F712d7DDD88A56;
