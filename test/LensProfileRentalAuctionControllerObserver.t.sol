@@ -50,6 +50,8 @@ contract LensProfileControllerObserverTest is Test, IRentalAuction {
     address public currentRenter;
     uint256 profileId;
 
+    bool public paused;
+
     event PostCreated(
         uint256 indexed profileId,
         uint256 indexed pubId,

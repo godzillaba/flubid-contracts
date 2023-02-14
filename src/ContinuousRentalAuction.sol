@@ -199,7 +199,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
         
-        address streamSender = decompiledContext.msgSender;
+        address streamSender = decompiledContext.msgSender; // todo: this assumes that acl isn't a thing, fix it to be actual stream sender. also prevent beneficiary from streaming to this app, can cause weirdness when paused i think
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
         if (inFlowRate < reserveRate) revert FlowRateTooLow();
@@ -264,7 +264,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
         
-        address streamSender = decompiledContext.msgSender;
+        address streamSender = decompiledContext.msgSender; // todo: don't use this as streamSender, use agreementData
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
         if (inFlowRate < reserveRate) revert FlowRateTooLow();
@@ -296,6 +296,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
 
             // delete flow to new top
+            // todo: test if it is possible for this to be already deleted by the bidder
             newCtx = acceptedToken.deleteFlowWithCtx(address(this), currentRenter, newCtx);
 
             // update flow to beneficiary
