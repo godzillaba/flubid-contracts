@@ -693,7 +693,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         daix.transfer(sender, 100 ether);
 
         vm.prank(sender);
-        // vm.expectRevert(bytes4(keccak256("Paused()"))); // for some reason this doesn't work
+        // vm.expectRevert(bytes4(keccak256("IsPaused()"))); // for some reason this doesn't work
         daix.createFlow(address(app), 10, abi.encode(address(0)));
     }
 
@@ -707,7 +707,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender = vm.addr(1);
 
         vm.prank(sender);
-        vm.expectRevert(bytes4(keccak256("Paused()")));
+        vm.expectRevert(bytes4(keccak256("IsPaused()")));
         daix.updateFlow(address(app), 10, abi.encode(address(0)));
     }
 

@@ -74,6 +74,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     event StreamUpdated(address indexed streamer, int96 flowRate);
     event StreamTerminated(address indexed streamer);
 
+    event Paused();
+    event UnPaused();
+
     /// @dev Thrown when the callback caller is not the host.
     error Unauthorized();
 
@@ -88,8 +91,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     error InvalidRight();
 
-    error Paused();
-    error NotPaused();
+    error IsPaused();
+    error IsNotPaused();
 
 
     function initialize(
@@ -140,12 +143,12 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     }
 
     modifier whenNotPaused() {
-        if (paused) revert Paused();
+        if (paused) revert IsPaused();
         _;
     }
 
     modifier whenPaused() {
-        if (!paused) revert NotPaused();
+        if (!paused) revert IsNotPaused();
         _;
     }
 
@@ -314,7 +317,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 newCtx = acceptedToken.createFlowWithCtx(_topStreamer, senderInfo[_topStreamer].flowRate, newCtx);
             }
             
-            // todo emit paused
+            emit Paused();
+
             return newCtx;
         }
         else if (streamSender == address(this)) {
@@ -399,6 +403,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             // we need to send a return stream to the top streamer
             acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
         }
+
+        emit Paused();
     }
 
     function unpause() external onlyController whenPaused {
@@ -413,6 +419,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             // we need to create flow to beneficiary
             acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
         }
+
+        emit UnPaused();
     }
     
     /*******************************************************
