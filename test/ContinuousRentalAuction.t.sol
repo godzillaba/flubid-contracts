@@ -669,8 +669,11 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
         // currentRenter
-        assertEq(app.currentRenter(), sender2);
+        assertEq(app.currentRenter(), address(0));
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -731,8 +734,11 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
+        // topStreamer
+        assertEq(app.topStreamer(), sender2);
+
         // currentRenter
-        assertEq(app.currentRenter(), sender2);
+        assertEq(app.currentRenter(), address(0));
 
         // netFlow = 0
         assertEq(netFlowApp, 0);
@@ -764,8 +770,11 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
         (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
 
+        // topStreamer
+        assertEq(app.topStreamer(), sender1);
+
         // currentRenter
-        assertEq(app.currentRenter(), sender1);
+        assertEq(app.currentRenter(), address(0));
 
         // netFlow = 0
         assertEq(netFlowApp, 0);

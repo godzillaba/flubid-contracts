@@ -55,7 +55,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     mapping(address => SenderInfoListNode) public senderInfo;
 
     /// @dev The sender of the stream with the highest flowrate. Marks right of linked list. When 0 there are now incoming streams
-    address public currentRenter;
+    address public topStreamer;
 
     bool public paused;
 
@@ -152,6 +152,10 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         _;
     }
 
+    function currentRenter() public view returns (address) {
+        return paused ? address(0) : topStreamer;
+    }
+
     function afterAgreementCreated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -179,7 +183,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
-        address oldRenter = currentRenter;
+        address oldRenter = topStreamer;
 
         _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
@@ -240,7 +244,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
-        address oldRenter = currentRenter;
+        address oldRenter = topStreamer;
 
         _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
@@ -261,23 +265,23 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         */
         
         // scenario 3 and 4 are the same
-        if (oldRenter != currentRenter) {
+        if (oldRenter != topStreamer) {
             // create flow to old top
             newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
 
             // delete flow to new top
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), currentRenter, newCtx);
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), topStreamer, newCtx);
 
             // update flow to beneficiary
-            int96 newTopRate = senderInfo[currentRenter].flowRate;
+            int96 newTopRate = senderInfo[topStreamer].flowRate;
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
             // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(currentRenter);
+            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(topStreamer);
 
-            emit RenterChanged(oldRenter, currentRenter);
+            emit RenterChanged(oldRenter, topStreamer);
         }
-        // scenario 1 (oldRenter == currentRenter here)
+        // scenario 1 (oldRenter == topStreamer here)
         else if (streamSender == oldRenter) {
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
         } 
@@ -310,7 +314,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             // the beneficiary has cancelled the stream from the app
             // we should pause
             paused = true;
-            address _topStreamer = currentRenter;
+            address _topStreamer = topStreamer;
 
             if (_topStreamer != address(0)) {
                 // we need to send a return stream to the top streamer
@@ -330,12 +334,12 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             return acceptedToken.deleteFlowWithCtx(streamReceiver, address(this), newCtx); 
         }
 
-        address oldRenter = currentRenter;
+        address oldRenter = topStreamer;
 
         // remove from linked list
         _removeSenderInfoListNode(streamSender);
 
-        address newTopStreamer = currentRenter;
+        address newTopStreamer = topStreamer;
 
         if (newTopStreamer == address(0)) {
             // deleted stream was the top and there are now no incoming streams
@@ -394,7 +398,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     function pause() external onlyController whenNotPaused {
         paused = true;
-        address _topStreamer = currentRenter;
+        address _topStreamer = topStreamer;
 
         if (_topStreamer != address(0)) {
             // delete beneficiary stream
@@ -410,7 +414,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     function unpause() external onlyController whenPaused {
         paused = false;
 
-        address _topStreamer = currentRenter;
+        address _topStreamer = topStreamer;
 
         if (_topStreamer != address(0)) {
             // we need to send a return stream to the top streamer
@@ -463,8 +467,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             senderInfo[center.right].left = center.left;
         }
         else {
-            // this is currentRenter
-            currentRenter = center.left;
+            // this is topStreamer
+            topStreamer = center.left;
         }
 
         assembly {
@@ -480,9 +484,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
         address left;
         if (right == address(0)) {
-            left = currentRenter;
+            left = topStreamer;
 
-            currentRenter = newSender;
+            topStreamer = newSender;
         }
         else {
             SenderInfoListNode storage rightNode = senderInfo[right];
