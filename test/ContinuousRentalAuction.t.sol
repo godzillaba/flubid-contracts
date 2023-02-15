@@ -765,6 +765,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         app.pause();
 
+        reportedRenter = reportedRenterPlaceholder;
+
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
@@ -795,12 +797,17 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(netFlowSender1, 0);
         assertEq(netFlowSender2, 0);
 
+        // make sure onRenterChanged isn't called
+        assertEq(reportedRenter, reportedRenterPlaceholder);
+
         assert(!sf.host.isAppJailed(app));
     }
 
     function testTerminateOnlyStreamWhenPaused() public {
         testCreateFirstStream(100);
         app.pause();
+
+        reportedRenter = reportedRenterPlaceholder;
 
         address sender = vm.addr(1);
 
@@ -825,6 +832,9 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(netFlowBeneficiary, 0);
 
         assertEq(netFlowSender, 0);
+
+        // make sure onRenterChanged isn't called
+        assertEq(reportedRenter, reportedRenterPlaceholder);
 
         assert(!sf.host.isAppJailed(app));
     }
@@ -885,7 +895,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     }
 
     // TODO: test unpause when there are some streams
-    // TODO: make sure onRenterChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
 
     /*******************************************************
      * 
