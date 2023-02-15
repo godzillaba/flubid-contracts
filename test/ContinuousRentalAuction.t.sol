@@ -494,6 +494,57 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // assume list is proper
     }
 
+    // test updating a stream that is top, but moves down the list
+    function testUpdateStreamHighHigh() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        reportedRenter = reportedRenterPlaceholder;
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        bytes memory newData = "new-data";
+
+        vm.prank(sender2);
+        // vm.expectEmit(true, true, false, false);
+        // emit RenterChanged(sender2, sender1);
+        vm.expectEmit(true, false, false, true);
+        emit StreamUpdated(sender2, 250);
+        daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
+
+        //// make sure onRenterChanged callback was called
+
+        assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // currentRenter
+        assertEq(app.currentRenter(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 250);
+        
+        // top streamer flow
+        assertEq(netFlowSender1, 0);
+
+        // losing streamer flow
+        assertEq(netFlowSender2, -250);
+
+        // user data
+        assertEq(app.senderUserData(sender1), "user-data-1");
+        assertEq(app.senderUserData(sender2), "new-data");
+
+        // assume list is proper
+    }
+
     function testTerminateOnlyStream(int96 flowRate) public {
         testCreateFirstStream(flowRate);
 

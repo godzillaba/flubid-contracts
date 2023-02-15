@@ -278,19 +278,22 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         senderUserData[streamSender] = userData;
 
         /*
-        There are 3 scenarios:
-        non top -> non top
+        There are 4 scenarios:
+        1. top -> top
+            updateFlow to beneficiary with new rate
+        2. non top -> non top
             updateFlow to sender with new rate
-        top -> non top
+        3. top -> non top
             createFlow to old top
             deleteFlow to new top
             updateFlow to beneficiary with new top flow
-        non top -> top
+        4. non top -> top
             createFlow to old top
             deleteFlow to new top
             updateFlow to beneficiary with new top flow
         */
         
+        // scenario 3 and 4 are the same
         if (oldRenter != currentRenter) {
             // create flow to old top
             newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
@@ -308,6 +311,11 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
             emit RenterChanged(oldRenter, currentRenter);
         }
+        // scenario 1 (oldRenter == currentRenter here)
+        else if (streamSender == oldRenter) {
+            newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
+        } 
+        // scenario 2
         else {
             // update flow to sender
             newCtx = acceptedToken.updateFlowWithCtx(streamSender, inFlowRate, newCtx);
