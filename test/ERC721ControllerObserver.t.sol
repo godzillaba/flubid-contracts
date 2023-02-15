@@ -5,7 +5,7 @@ import "forge-std/Test.sol";
 import {ERC721} from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
-import { ControllerObserver } from "../src/controllers/ControllerObserver.sol";
+import { ERC721ControllerObserver } from "../src/controllers/ERC721ControllerObserver.sol";
 
 contract ERC721Mintable is ERC721 {
     constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) {}
@@ -14,7 +14,7 @@ contract ERC721Mintable is ERC721 {
     }
 }
 
-contract TestControllerObserver is ControllerObserver {
+contract TestControllerObserver is ERC721ControllerObserver {
     uint256 onRenterChangedCallNum;
     address reportedRenter;
     function _onRenterChanged(address newRenter) internal virtual override {}
@@ -25,7 +25,7 @@ contract TestControllerObserver is ControllerObserver {
     }
 }
 
-contract ControllerObserverTest is Test, IRentalAuction {
+contract ERC721ControllerObserverTest is Test, IRentalAuction {
     ERC721Mintable tokenContract;
     TestControllerObserver controllerObserver;
 

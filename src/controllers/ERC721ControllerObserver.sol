@@ -3,14 +3,14 @@ pragma solidity ^0.8.13;
 
 // import { OwnableUpgradeable } from "openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
 import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.sol";
-import { IERC721Metadata } from "openzeppelin-contracts/token/ERC721/extensions/IERC721Metadata.sol";
+import { IERC721 } from "openzeppelin-contracts/token/ERC721/IERC721.sol";
 
 import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
 
 
-abstract contract ControllerObserver is Initializable, IRentalAuctionControllerObserver {
-    IERC721Metadata internal tokenContract;
+abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionControllerObserver {
+    IERC721 internal tokenContract;
     uint256 internal tokenId;
 
     address public owner;
@@ -31,7 +31,7 @@ abstract contract ControllerObserver is Initializable, IRentalAuctionControllerO
         owner = _owner;
 
         rentalAuction = _rentalAuction;
-        (tokenContract, tokenId) = abi.decode(extraArgs, (IERC721Metadata, uint256));
+        (tokenContract, tokenId) = abi.decode(extraArgs, (IERC721, uint256));
     }
 
     modifier onlyRentalAuction {
