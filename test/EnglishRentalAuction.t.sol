@@ -118,11 +118,6 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function onRenterChanged(address newRenter) public {
         reportedRenter = newRenter;
     }
-    function underlyingTokenContract() external view returns (address) {}
-
-    function underlyingTokenID() external view returns (uint256) {}
-    function startAuction() external view override {}
-    function stopAuction() external view override {}
 
     function initialize(IRentalAuction, address, bytes calldata) external view {}
 

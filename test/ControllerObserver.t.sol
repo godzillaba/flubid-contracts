@@ -25,7 +25,7 @@ contract TestControllerObserver is ControllerObserver {
     }
 }
 
-contract LensProfileControllerObserverTest is Test, IRentalAuction {
+contract ControllerObserverTest is Test, IRentalAuction {
     ERC721Mintable tokenContract;
     TestControllerObserver controllerObserver;
 
