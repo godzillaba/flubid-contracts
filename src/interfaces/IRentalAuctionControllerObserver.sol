@@ -15,4 +15,8 @@ interface IRentalAuctionControllerObserver {
 
     function underlyingTokenContract() external view returns (address);
     function underlyingTokenID() external view returns (uint256);
+
+    // function rentalAuction() external view returns (address);
+
+    // todo: only 2 first funcs in here
 }

@@ -1,86 +1,86 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+// import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
-import { IBaseRegistrar } from "ens-contracts/ethregistrar/IBaseRegistrar.sol";
+// import { IBaseRegistrar } from "ens-contracts/ethregistrar/IBaseRegistrar.sol";
 
-import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
-import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
-// vitalik 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
-// ens 0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85
+// import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionControllerObserver.sol";
+// import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
+// // vitalik 0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045
+// // ens 0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85
 
-contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializable {
-    IBaseRegistrar constant ensRegistrar = IBaseRegistrar(0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85);
+// contract ENSControllerObserver is IRentalAuctionControllerObserver, Initializable {
+//     IBaseRegistrar constant ensRegistrar = IBaseRegistrar(0x57f1887a8BF19b14fC0dF6Fd9B2acc9Af147eA85);
 
-    IRentalAuction rentalAuction;
+//     IRentalAuction rentalAuction;
 
-    uint256 ensTokenId;
+//     uint256 ensTokenId;
 
-    address owner;
+//     address owner;
 
-    error Unauthorized();
+//     error Unauthorized();
 
-    error ENSNameNotOwned();
+//     error ENSNameNotOwned();
 
-    function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata extraArgs) external initializer {
-        owner = _owner;
-        rentalAuction = _rentalAuction;
-        (ensTokenId) = abi.decode(extraArgs, (uint256));
-    }
+//     function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata extraArgs) external initializer {
+//         owner = _owner;
+//         rentalAuction = _rentalAuction;
+//         (ensTokenId) = abi.decode(extraArgs, (uint256));
+//     }
 
-    modifier onlyRentalAuction {
-        if (msg.sender != address(rentalAuction)) revert Unauthorized();
-        _;
-    }
+//     modifier onlyRentalAuction {
+//         if (msg.sender != address(rentalAuction)) revert Unauthorized();
+//         _;
+//     }
 
-    modifier onlyOwner {
-        if (msg.sender != owner) revert Unauthorized();
-        _;
-    }
+//     modifier onlyOwner {
+//         if (msg.sender != owner) revert Unauthorized();
+//         _;
+//     }
 
-    function _setENSNameController(address controller) private {
-        // reclaim will set the controller
-        ensRegistrar.reclaim(ensTokenId, controller);
-    }
+//     function _setENSNameController(address controller) private {
+//         // reclaim will set the controller
+//         ensRegistrar.reclaim(ensTokenId, controller);
+//     }
 
-    function _transferENSName(address to) private {
-        ensRegistrar.transferFrom(address(this), to, ensTokenId);
-    }
+//     function _transferENSName(address to) private {
+//         ensRegistrar.transferFrom(address(this), to, ensTokenId);
+//     }
 
-    function onRenterChanged(address newRenter) external onlyRentalAuction {
-        if (ensRegistrar.ownerOf(ensTokenId) != address(this)) revert ENSNameNotOwned();
-        _setENSNameController(newRenter);
-    }
+//     function onRenterChanged(address newRenter) external onlyRentalAuction {
+//         if (ensRegistrar.ownerOf(ensTokenId) != address(this)) revert ENSNameNotOwned();
+//         _setENSNameController(newRenter);
+//     }
 
-    // TODO: isActive or something like that. It lets the auction contract know if it can accept bids or whatever else.
+//     // TODO: isActive or something like that. It lets the auction contract know if it can accept bids or whatever else.
 
-    function stopAuction() external onlyOwner {
-        // pause auction
-        rentalAuction.pause();
+//     function stopAuction() external onlyOwner {
+//         // pause auction
+//         rentalAuction.pause();
         
-        // set controller
-        _setENSNameController(owner);
+//         // set controller
+//         _setENSNameController(owner);
 
-        // transfer NFT out
-        _transferENSName(owner);
-    }
+//         // transfer NFT out
+//         _transferENSName(owner);
+//     }
 
-    function startAuction() external onlyOwner {
-        // make sure we have the NFT
-        if (ensRegistrar.ownerOf(ensTokenId) != address(this)) revert ENSNameNotOwned();
+//     function startAuction() external onlyOwner {
+//         // make sure we have the NFT
+//         if (ensRegistrar.ownerOf(ensTokenId) != address(this)) revert ENSNameNotOwned();
 
-        // unpause auction
-        rentalAuction.unpause();
+//         // unpause auction
+//         rentalAuction.unpause();
 
-        // set controller to current top bidder if it isn't 0x00
-        address topStreamer = rentalAuction.currentRenter();
-        if (topStreamer != address(0)) {
-            _setENSNameController(topStreamer);
-        }
-    }
+//         // set controller to current top bidder if it isn't 0x00
+//         address topStreamer = rentalAuction.currentRenter();
+//         if (topStreamer != address(0)) {
+//             _setENSNameController(topStreamer);
+//         }
+//     }
 
-    function underlyingTokenContract() external view override returns (address) {} // todo
+//     function underlyingTokenContract() external view override returns (address) {} // todo
 
-    function underlyingTokenID() external view override returns (uint256) {} // todo
-}
+//     function underlyingTokenID() external view override returns (uint256) {} // todo
+// }

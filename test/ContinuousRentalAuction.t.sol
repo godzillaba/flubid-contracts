@@ -29,6 +29,7 @@ import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAucti
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
 // TODO: explicitly set gitmodules versions
+// todo: prevent beneficiary from placing bid (same w english)
 
 contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
