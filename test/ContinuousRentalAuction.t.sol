@@ -815,6 +815,51 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assert(app.paused());
     }
 
+    function testNonTopBidderClosesReturnStream() public {
+        // this should have the same effect as the sender deleting the stream TO the app
+        testCreateSecondStreamLarger(100, 200);
+
+        reportedRenter = reportedRenterPlaceholder;
+
+        address sender1 = vm.addr(1);
+        address sender2 = vm.addr(2);
+
+        vm.prank(sender1);
+        vm.expectEmit(true, false, false, false);
+        emit StreamTerminated(sender1);
+        daix.deleteFlow(address(app), sender1);
+
+        //// make sure onRenterChanged callback was NOT called
+
+        assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(sender1);
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(sender2);
+
+        // currentRenter
+        assertEq(app.currentRenter(), sender2);
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 200);
+
+        // deleted streamer flow
+        assertEq(netFlowSender1, 0);
+
+        // top streamer flow
+        assertEq(netFlowSender2, -200);
+
+        // assume list is proper
+
+        assert(!sf.host.isAppJailed(app)); // todo put this wherever afterTerminated callback could occur
+    }
+
     // TODO: test unpause when there are some streams
     // TODO: make sure onRenterChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
     // TODO: test bidder in 2nd place has close to 0 daix when 1st place deletes their stream

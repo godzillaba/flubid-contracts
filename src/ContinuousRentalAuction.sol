@@ -263,7 +263,6 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
 
             // delete flow to new top
-            // todo: test if it is possible for this to be already deleted by the bidder
             newCtx = acceptedToken.deleteFlowWithCtx(address(this), currentRenter, newCtx);
 
             // update flow to beneficiary
@@ -317,6 +316,14 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             
             // todo emit paused
             return newCtx;
+        }
+        else if (streamSender == address(this)) {
+            // some bidder has terminated their return stream
+            // they are necessarily not the current renter
+            // we should terminate the corresponding inbound stream and remove them from the linked list
+            _removeSenderInfoListNode(streamReceiver);
+            emit StreamTerminated(streamReceiver);
+            return acceptedToken.deleteFlowWithCtx(streamReceiver, address(this), newCtx); 
         }
 
         address oldRenter = currentRenter;
@@ -449,7 +456,6 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         }
         else {
             // this is currentRenter
-            require(sender == currentRenter, "TODO REMOVE DEBUG 1");
             currentRenter = center.left;
         }
 
