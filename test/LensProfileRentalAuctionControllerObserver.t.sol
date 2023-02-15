@@ -186,8 +186,4 @@ contract LensProfileControllerObserverTest is Test, IRentalAuction {
     function pause() external override {}
 
     function unpause() external override {}
-
-    function senderUserData(
-        address sender
-    ) external view override returns (bytes memory) {}
 }

@@ -143,7 +143,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender);
         // vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
-        daix.createFlow(address(app), reserveRate - 1, abi.encode(address(0), bytes("")));
+        daix.createFlow(address(app), reserveRate - 1, abi.encode(address(0)));
     }
 
     function testUpdateStreamMustBeAtLeastReserveRate() public {
@@ -153,7 +153,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(sender);
         vm.expectRevert(bytes4(keccak256("FlowRateTooLow()")));
-        daix.updateFlow(address(app), reserveRate - 1, abi.encode(address(0), bytes("hi")));
+        daix.updateFlow(address(app), reserveRate - 1, abi.encode(address(0)));
     }
 
     function testCreateFirstStream(int96 flowRate) public {
@@ -163,7 +163,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         reportedRenter = reportedRenterPlaceholder;
 
         address sender = vm.addr(1);
-        bytes memory userData = bytes("user-data-1");
 
         vm.prank(bank);
         daix.transfer(sender, 100 ether);
@@ -176,7 +175,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.expectEmit(true, false, false, true);
         emit NewInboundStream(sender, flowRate);
         
-        daix.createFlow(address(app), flowRate, abi.encode(address(0), userData));
+        daix.createFlow(address(app), flowRate, abi.encode(address(0)));
         
         vm.stopPrank();
 
@@ -201,9 +200,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         
         // top streamer flow
         assertEq(netFlowSender, -flowRate);
-
-        // user data
-        assertEq(app.senderUserData(sender), userData);
 
         // assume list is proper
     }
@@ -230,9 +226,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory userData1 = bytes("user-data-1");
-        bytes memory userData2 = bytes("user-data-2");
-
         vm.prank(bank);
         daix.transfer(sender2, 100 ether);
 
@@ -243,7 +236,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         emit NewInboundStream(sender2, secondRate);
         
         vm.prank(sender2);
-        daix.createFlow(address(app), secondRate, abi.encode(address(0), userData2));
+        daix.createFlow(address(app), secondRate, abi.encode(address(0)));
 
         //// make sure onRenterChanged callback was called appropriately
 
@@ -271,10 +264,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // losing streamer flow
         assertEq(netFlowSender1, 0);
 
-        // user data
-        assertEq(app.senderUserData(sender1), userData1);
-        assertEq(app.senderUserData(sender2), userData2);
-
         // assume list is proper
     }
 
@@ -298,9 +287,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory userData1 = bytes("user-data-1");
-        bytes memory userData2 = bytes("user-data-2");
-
         vm.prank(bank);
         daix.transfer(sender2, 100 ether);
 
@@ -308,7 +294,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         emit NewInboundStream(sender2, secondRate);
         
         vm.prank(sender2);
-        daix.createFlow(address(app), secondRate, abi.encode(sender1, userData2));
+        daix.createFlow(address(app), secondRate, abi.encode(sender1));
 
         //// make sure onRenterChanged callback was NOT called
 
@@ -336,10 +322,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // losing streamer flow
         assertEq(netFlowSender2, 0);
 
-        // user data
-        assertEq(app.senderUserData(sender1), userData1);
-        assertEq(app.senderUserData(sender2), userData2);
-
         // assume list is proper
     }
 
@@ -352,12 +334,10 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory newData = "new-data";
-
         vm.prank(sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender1, 150);
-        daix.updateFlow(address(app), 150, abi.encode(sender2, newData));
+        daix.updateFlow(address(app), 150, abi.encode(sender2));
 
         //// make sure onRenterChanged callback was NOT called
 
@@ -385,10 +365,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // losing streamer flow
         assertEq(netFlowSender1, 0);
 
-        // user data
-        assertEq(app.senderUserData(sender1), "new-data");
-        assertEq(app.senderUserData(sender2), "user-data-2");
-
         // assume list is proper
     }
 
@@ -401,14 +377,12 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory newData = "new-data";
-
         vm.prank(sender1);
         vm.expectEmit(true, true, false, false);
         emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender1, 250);
-        daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
+        daix.updateFlow(address(app), 250, abi.encode(address(0)));
 
         //// make sure onRenterChanged callback was called
 
@@ -436,10 +410,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // losing streamer flow
         assertEq(netFlowSender2, 0);
 
-        // user data
-        assertEq(app.senderUserData(sender1), "new-data");
-        assertEq(app.senderUserData(sender2), "user-data-2");
-
         // assume list is proper
     }
 
@@ -452,14 +422,12 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory newData = "new-data";
-
         vm.prank(sender2);
         vm.expectEmit(true, true, false, false);
         emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender2, 50);
-        daix.updateFlow(address(app), 50, abi.encode(address(sender1), newData));
+        daix.updateFlow(address(app), 50, abi.encode(address(sender1)));
 
         //// make sure onRenterChanged callback was called
 
@@ -487,10 +455,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // losing streamer flow
         assertEq(netFlowSender2, 0);
 
-        // user data
-        assertEq(app.senderUserData(sender1), "user-data-1");
-        assertEq(app.senderUserData(sender2), "new-data");
-
         // assume list is proper
     }
 
@@ -503,14 +467,12 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender1 = vm.addr(1);
         address sender2 = vm.addr(2);
 
-        bytes memory newData = "new-data";
-
         vm.prank(sender2);
         // vm.expectEmit(true, true, false, false);
         // emit RenterChanged(sender2, sender1);
         vm.expectEmit(true, false, false, true);
         emit StreamUpdated(sender2, 250);
-        daix.updateFlow(address(app), 250, abi.encode(address(0), newData));
+        daix.updateFlow(address(app), 250, abi.encode(address(0)));
 
         //// make sure onRenterChanged callback was called
 
@@ -537,10 +499,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // losing streamer flow
         assertEq(netFlowSender2, -250);
-
-        // user data
-        assertEq(app.senderUserData(sender1), "user-data-1");
-        assertEq(app.senderUserData(sender2), "new-data");
 
         // assume list is proper
     }
@@ -730,14 +688,13 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.pause();
 
         address sender = vm.addr(1);
-        bytes memory userData = bytes("user-data-1");
 
         vm.prank(bank);
         daix.transfer(sender, 100 ether);
 
         vm.prank(sender);
         // vm.expectRevert(bytes4(keccak256("Paused()"))); // for some reason this doesn't work
-        daix.createFlow(address(app), 10, abi.encode(address(0), userData));
+        daix.createFlow(address(app), 10, abi.encode(address(0)));
     }
 
     function testUpdateStreamWhenPaused() public {
@@ -748,11 +705,10 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.pause();
 
         address sender = vm.addr(1);
-        bytes memory userData = bytes("user-data-1");
 
         vm.prank(sender);
         vm.expectRevert(bytes4(keccak256("Paused()")));
-        daix.updateFlow(address(app), 10, abi.encode(address(0), userData));
+        daix.updateFlow(address(app), 10, abi.encode(address(0)));
     }
 
     function testTerminateLowerStreamWhenPaused() public {

@@ -58,9 +58,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     address public topBidder;
     int96 public topFlowRate;
 
-    /// @dev maps a bidder to their user data. They provide this data when placing a bid
-    mapping(address => bytes) public senderUserData; // todo
-
     // todo: maybe gas can be optimized here by packing in some uint8 in the same slot that is 1 or something
     uint8 private __gasThingy;
     bool public paused;
@@ -289,7 +286,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // sender should have approved this contract to spend acceptedToken and manage streams for them
     // will revert if it is not approved for ERC20 transfer
     // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.
-    // todo: userData
     function placeBid(int96 flowRate, bytes calldata _ctx) external onlyHost whenBiddingPhase whenNotPaused returns (bytes memory) {
         address msgSender = host.decodeCtx(_ctx).msgSender;
         
@@ -328,7 +324,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     //     currentRenter = renter
     //     topFlowRate = renter's flow rate
-    //     senderUserData = whatever
     //     paused = false
     //     depositClaimed = false
     //     currentPhaseEndTime = time at which rental expires and bidding can start again
@@ -340,7 +335,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     //     currentRenter = renter
     //     topFlowRate = renter's flow rate
-    //     senderUserData = whatever
     //     paused = false
     //     depositClaimed = true or false
     //     currentPhaseEndTime = time at which rental expires and bidding can start again
@@ -351,7 +345,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     //     currentRenter = undefined? (or 0x00?)
     //     topFlowRate = 0
-    //     senderUserData = whatever
     //     paused = false
     //     depositClaimed = false
     //     currentPhaseEndTime = 0
@@ -362,7 +355,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     //     currentRenter = the next renter
     //     topFlowRate = next renter's rate
-    //     senderUserData = whatever
     //     paused = false
     //     depositClaimed = false
     //     currentPhaseEndTime = time at which bidding ended
@@ -480,7 +472,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         ISuperToken _superToken,
         address _agreementClass,
         bytes32, // _agreementId,
-        bytes calldata, // _agreementData
+        bytes calldata _agreementData,
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
@@ -496,10 +488,10 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         address _topBidder = topBidder;
         int96 _topFlowRate = topFlowRate;
 
-        address msgSender = host.decodeCtx(newCtx).msgSender;
+        (address streamSender,) = abi.decode(_agreementData, (address,address));
 
         // if we are not in renting phase or msgSender is not currentRenter, then do nothing
-        if (!isBiddingPhase && msgSender == _topBidder) {
+        if (!isBiddingPhase && streamSender == _topBidder) {
             // the current renter has terminated their stream
             
             // delete flow to beneficiary (not reentrant)
@@ -512,11 +504,11 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
                 if (streamedAmount >= depositSize) {
                     // not reentrant
-                    acceptedToken.transfer(msgSender, depositSize);
+                    acceptedToken.transfer(streamSender, depositSize);
                 }
                 else {
                     acceptedToken.transfer(beneficiary, depositSize - streamedAmount);
-                    acceptedToken.transfer(msgSender, streamedAmount);
+                    acceptedToken.transfer(streamSender, streamedAmount);
                 }
             }
 

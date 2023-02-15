@@ -20,32 +20,6 @@ import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 TODO:
 
 rename ethereum-contracts gitmodule
-
-constructor arg for IRentalAuctionControllerObserver (or IRentalAuctionEventHandler, IRentalAuctionHooks, IRentalAuctionController). A contract that gets called when a new winner is assigned (and can also cancel the auction)
-    must be erc165 
-supportsInterface
-
-a func on RentalAuction called something like closeAuction(). 
-    This function must have some type of access control. 
-    It is used to stop the auction and redirect any streams back to senders. 
-    now revert on afterAgreementCreated
-
-    also have kickSender() - for giving senders time limits or rejecting them for whatever other reason
-
-have a reserve rate, all streams must be >= this minumum
-
-make a description field (link to ipfs)
-
-
-make a new contract that has support for minimum rental times
-    new contract works more like a traditional auction. 
-    there is a period where people can bid (open stream + make deposit)
-    renter can back out, but if they do so prematurely, a portion of their deposit gets taken
-    renter (or owner) specifies the duration that they are guaranteed to rent the item for (unless they cancel)
-
-    no linked list in this one, you either outbid the top bidder or don't bid at all
-        when current top bidder is outbid, their deposit is returned to them
-
 */
 
 contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction {
@@ -82,9 +56,6 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
     /// @dev The sender of the stream with the highest flowrate. Marks right of linked list. When 0 there are now incoming streams
     address public currentRenter;
-
-    /// @dev maps a sender to their user data. They provide this data when creating or updating a stream
-    mapping(address => bytes) public senderUserData;
 
     bool public paused;
 
@@ -134,7 +105,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
-        require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow (TODO: why is this here it makes no sense)
+        // require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow (TODO: why is this here it makes no sense)
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
@@ -182,7 +153,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         ISuperToken _superToken,
         address _agreementClass,
         bytes32, //_agreementId
-        bytes calldata, //_agreementData
+        bytes calldata _agreementData,
         bytes calldata, //_cbdata
         bytes calldata _ctx
     )
@@ -196,21 +167,18 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         // it is not possible that stream sender already has a stream to this app
 
         newCtx = _ctx;
-
-        ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
         
-        address streamSender = decompiledContext.msgSender; // todo: this assumes that acl isn't a thing, fix it to be actual stream sender. also prevent beneficiary from streaming to this app, can cause weirdness when paused i think
+        (address streamSender,) = abi.decode(_agreementData, (address,address));
+
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
         if (inFlowRate < reserveRate) revert FlowRateTooLow();
 
-        (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
+        (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
         address oldRenter = currentRenter;
 
         _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
-
-        senderUserData[streamSender] = userData;
 
         if (rightAddress == address(0)) {
             // this is the new top streamer
@@ -247,7 +215,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         ISuperToken _superToken,
         address _agreementClass,
         bytes32, // _agreementId,
-        bytes calldata, // _agreementData,
+        bytes calldata _agreementData,
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     )
@@ -261,21 +229,17 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         // it is not possible that stream sender does not already has a stream to this app
 
         newCtx = _ctx;
-
-        ISuperfluid.Context memory decompiledContext = host.decodeCtx(_ctx);
         
-        address streamSender = decompiledContext.msgSender; // todo: don't use this as streamSender, use agreementData
+        (address streamSender,) = abi.decode(_agreementData, (address,address));
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
         if (inFlowRate < reserveRate) revert FlowRateTooLow();
 
-        (address rightAddress, bytes memory userData) = abi.decode(decompiledContext.userData, (address, bytes));
+        (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
         address oldRenter = currentRenter;
 
         _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
-
-        senderUserData[streamSender] = userData;
 
         /*
         There are 4 scenarios:
@@ -328,7 +292,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         ISuperToken _superToken,
         address _agreementClass,
         bytes32, // _agreementId,
-        bytes calldata, // _agreementData
+        bytes calldata _agreementData,
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
@@ -339,7 +303,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         newCtx = _ctx;
 
-        address streamSender = host.decodeCtx(newCtx).msgSender;
+        (address streamSender,) = abi.decode(_agreementData, (address,address));
 
         address oldRenter = currentRenter;
 
