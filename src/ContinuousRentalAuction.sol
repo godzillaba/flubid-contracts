@@ -302,8 +302,22 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         }
 
         newCtx = _ctx;
+        (address streamSender, address streamReceiver) = abi.decode(_agreementData, (address,address));
 
-        (address streamSender,) = abi.decode(_agreementData, (address,address));
+        if (streamSender == address(this) && streamReceiver == beneficiary) {
+            // the beneficiary has cancelled the stream from the app
+            // we should pause
+            paused = true;
+            address _topStreamer = currentRenter;
+
+            if (_topStreamer != address(0)) {
+                // we need to send a return stream to the top streamer
+                newCtx = acceptedToken.createFlowWithCtx(_topStreamer, senderInfo[_topStreamer].flowRate, newCtx);
+            }
+            
+            // todo emit paused
+            return newCtx;
+        }
 
         address oldRenter = currentRenter;
 

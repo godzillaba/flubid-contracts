@@ -806,6 +806,15 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(netFlowSender, 0);
     }
 
+    function testBeneficiaryClosesStream() public {
+        testCreateSecondStreamLarger(100, 200);
+
+        vm.prank(beneficiary);
+        daix.deleteFlow(address(app), beneficiary);
+
+        assert(app.paused());
+    }
+
     // TODO: test unpause when there are some streams
     // TODO: make sure onRenterChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
     // TODO: test bidder in 2nd place has close to 0 daix when 1st place deletes their stream

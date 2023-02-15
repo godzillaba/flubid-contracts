@@ -6,6 +6,6 @@
   "license": "MIT",
   "scripts": {
     "test": "forge test --fork-url https://matic-testnet-archive-rpc.bwarelabs.com",
-    "coverage": "forge coverage --fork-url https://matic-testnet-archive-rpc.bwarelabs.com --report lcov"
+    "coverage": "forge coverage --fork-url https://matic-testnet-archive-rpc.bwarelabs.com --report lcov && genhtml lcov.info -o coverage"
   }
 }
