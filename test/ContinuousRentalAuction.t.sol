@@ -539,6 +539,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // deleted streamer flow
         assertEq(netFlowSender, 0);
 
+        assert(!sf.host.isAppJailed(app));
+
         // assume list is proper
     }
 
@@ -583,6 +585,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // new top streamer flow
         assertEq(netFlowSender1, -100);
 
+        assert(!sf.host.isAppJailed(app));
+
         // assume list is proper
     }
 
@@ -625,6 +629,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // top streamer flow
         assertEq(netFlowSender2, -200);
 
+        assert(!sf.host.isAppJailed(app));
+
         // assume list is proper
     }
 
@@ -637,6 +643,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.prank(vm.addr(2));
         daix.deleteFlow(vm.addr(2), address(app));
+
+        assert(!sf.host.isAppJailed(app));
     }
 
     /*******************************************************
@@ -748,6 +756,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         assertEq(netFlowSender1, 0);
         assertEq(netFlowSender2, 0);
+
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testTerminateTopStreamWhenPaused() public {
@@ -784,6 +794,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         assertEq(netFlowSender1, 0);
         assertEq(netFlowSender2, 0);
+
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testTerminateOnlyStreamWhenPaused() public {
@@ -813,6 +825,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(netFlowBeneficiary, 0);
 
         assertEq(netFlowSender, 0);
+
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testBeneficiaryClosesStream() public {
@@ -822,6 +836,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         daix.deleteFlow(address(app), beneficiary);
 
         assert(app.paused());
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testNonTopBidderClosesReturnStream() public {
@@ -866,12 +881,11 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // assume list is proper
 
-        assert(!sf.host.isAppJailed(app)); // todo put this wherever afterTerminated callback could occur
+        assert(!sf.host.isAppJailed(app));
     }
 
     // TODO: test unpause when there are some streams
     // TODO: make sure onRenterChanged callback is NOT called in afterAgreementTerminated callback when auction is paused
-    // TODO: test bidder in 2nd place has close to 0 daix when 1st place deletes their stream
 
     /*******************************************************
      * 
