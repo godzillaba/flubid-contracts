@@ -186,6 +186,10 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         sf.host.batchCall(ops);
     }
 
+    function testFailBeneficiaryCannotBid() public {
+        bid(beneficiary, reserveRate);
+    }
+
     function testSuccessfulBid(int96 flowRate) public {
         vm.assume(flowRate >= reserveRate);
         vm.assume(uint96(flowRate) * uint256(minRentalDuration) < 0.5 ether);

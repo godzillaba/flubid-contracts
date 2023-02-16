@@ -124,6 +124,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     error DepositAlreadyClaimed();
     error TooEarlyToReclaimDeposit();
 
+    error BeneficiaryCannotBid();
+
     error Unknown();
 
     event Initialized(
@@ -250,6 +252,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // check that the flowRate is valid and higher than the last bid
         if (flowRate <= 0) revert InvalidFlowRate();
         if (!isBidHigher(flowRate, topFlowRate) || flowRate < reserveRate) revert FlowRateTooLow();
+        if (msgSender == beneficiary) revert BeneficiaryCannotBid();
 
         // save this user's bid
         int96 oldTopFlowRate = topFlowRate;

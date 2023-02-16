@@ -150,6 +150,17 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         daix.updateFlow(address(app), reserveRate - 1, abi.encode(address(0)));
     }
 
+    function testFailBeneficiaryCannotCreateStream() public {
+        vm.prank(bank);
+        daix.transfer(beneficiary, 100 ether);
+
+        vm.startPrank(beneficiary);
+        // vm.expectRevert(bytes4(keccak256("BeneficiaryCannotBid()")));
+        // vm.expectRevert(ContinuousRentalAuction.BeneficiaryCannotBid.selector);
+        daix.createFlow(address(app), reserveRate + 1, abi.encode(address(0)));
+        vm.stopPrank();
+    }
+
     function testCreateFirstStream(int96 flowRate) public {
         vm.assume(flowRate < 0.01 ether && flowRate >= reserveRate);
         vm.assume(daix.getBufferAmountByFlowRate(flowRate) < 50 ether);

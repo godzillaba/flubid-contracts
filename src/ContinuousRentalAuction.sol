@@ -94,6 +94,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     error IsPaused();
     error IsNotPaused();
 
+    error BeneficiaryCannotBid();
+
 
     function initialize(
         ISuperToken _acceptedToken,
@@ -176,6 +178,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         newCtx = _ctx;
         
         (address streamSender,) = abi.decode(_agreementData, (address,address));
+
+        if (streamSender == beneficiary) revert BeneficiaryCannotBid();
 
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
