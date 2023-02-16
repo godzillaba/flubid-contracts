@@ -87,9 +87,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     event TransitionedToBiddingPhaseEarly(address indexed renter, int96 flowRate);
 
-    event UnpausedAuction();
+    event Unpaused();
 
-    event PausedAuction(address indexed topBidder, int96 flowRate);
+    event Paused(address indexed topBidder, int96 flowRate);
 
     /*******************************************************
      * 
@@ -110,8 +110,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     error InvalidFlowRate();
 
-    error Paused();
-    error NotPaused();
+    error IsPaused();
+    error IsNotPaused();
 
     error NotBiddingPhase();
     error NotRentalPhase();
@@ -190,6 +190,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         __gasThingy = 1;
         isBiddingPhase = true;
+        paused = true;
 
         emit Initialized(
             address(_acceptedToken), 
@@ -221,12 +222,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     }
 
     modifier whenNotPaused() {
-        if (paused) revert Paused();
+        if (paused) revert IsPaused();
         _;
     }
 
     modifier whenPaused() {
-        if (!paused) revert NotPaused();
+        if (!paused) revert IsNotPaused();
         _;
     }
 
@@ -551,12 +552,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         currentPhaseEndTime = 0;
         topFlowRate = 0;
 
-        emit PausedAuction(_topBidder, _topFlowRate);
+        emit Paused(_topBidder, _topFlowRate);
     }
 
     function unpause() external onlyController whenPaused {
         paused = false;
 
-        emit UnpausedAuction();
+        emit Unpaused();
     }
 }

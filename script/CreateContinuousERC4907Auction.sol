@@ -7,9 +7,9 @@ import { ISuperfluid, ISuperToken } from "superfluid-finance/contracts/interface
 
 
 contract CreateContinuousERC4907Auction is Script {
-    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x232BbC02b5FF8bFc94CB9b7163F58f8bF82E6AfD);
+    ContinuousRentalAuctionFactory factory = ContinuousRentalAuctionFactory(0x862E55E8ab6CD3cf914Cd889e22C142BD7faD15f);
 
-    address erc4907ControllerObserverImpl = 0xbDb5baeb476AeE7904441039e1F712d7DDD88A56;
+    address erc4907ControllerObserverImpl = 0x786f9d6Cd7B63b7d69fB716E3b16eb9e54E6AE4D;
     address erc4907 = 0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B;
 
     uint256 minimumBidFactorWad = 1.05 ether;

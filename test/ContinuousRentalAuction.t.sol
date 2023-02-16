@@ -105,6 +105,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         ISuperfluid(sf.host).registerAppByFactory(app, configWord);
         app.initialize(daix, sf.host, sf.cfa, IRentalAuctionControllerObserver(address(this)), beneficiary, minimumBidFactorWad, reserveRate);
+        app.unpause();
     }
 
     function onRenterChanged(address newRenter) public {

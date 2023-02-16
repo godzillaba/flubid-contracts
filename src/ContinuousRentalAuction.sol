@@ -75,7 +75,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     event StreamTerminated(address indexed streamer);
 
     event Paused();
-    event UnPaused();
+    event Unpaused();
 
     /// @dev Thrown when the callback caller is not the host.
     error Unauthorized();
@@ -124,6 +124,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         beneficiary = _beneficiary;
         minimumBidFactorWad = _minimumBidFactorWad;
         reserveRate = _reserveRate;
+
+        paused = true;
         
         emit Initialized(address(_acceptedToken), address(_controllerObserver), _beneficiary, _minimumBidFactorWad, _reserveRate);
     }
@@ -428,7 +430,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
         }
 
-        emit UnPaused();
+        emit Unpaused();
     }
     
     /*******************************************************

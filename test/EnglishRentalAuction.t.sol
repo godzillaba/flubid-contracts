@@ -112,6 +112,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
             biddingPhaseDuration,
             biddingPhaseExtensionDuration
         );
+
+        app.unpause();
     }
 
     // todo: make sure this is only called ONCE. have a counter that is set to 0 before this is expected to be called
