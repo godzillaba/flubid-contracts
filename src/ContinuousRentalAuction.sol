@@ -60,7 +60,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     bool public paused;
 
     int96 public reserveRate;
-
+    
+    // todo get rid of this
     event Initialized(
         address indexed acceptedToken, 
         address indexed controllerObserver, 

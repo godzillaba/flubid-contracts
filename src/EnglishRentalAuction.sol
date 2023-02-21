@@ -435,6 +435,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         }
 
         if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
+
+        emit TransitionedToBiddingPhase();
     }
 
     function afterAgreementCreated(
