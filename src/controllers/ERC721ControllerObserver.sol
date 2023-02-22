@@ -13,15 +13,15 @@ import { IRentalAuctionControllerObserver } from "../interfaces/IRentalAuctionCo
 /// @dev Any inheriting contract must implement the _onRenterChanged function
 abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionControllerObserver {
     /// @notice The ERC721 token contract
-    IERC721 internal _tokenContract;
+    IERC721 internal tokenContract;
     /// @notice The ERC721 token id
-    uint256 internal _tokenId;
+    uint256 internal tokenId;
 
     /// @notice The owner of this controller contract
-    address public _owner;
+    address public owner;
 
     /// @notice The rental auction contract that this controller is attached to
-    IRentalAuction public _rentalAuction;
+    IRentalAuction public rentalAuction;
 
     /// @notice Emitted when the auction is stopped
     event AuctionStopped();
@@ -43,25 +43,24 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
 
     /// @notice Error indicating that the caller is not authorized. (some functions are only callable by the owner or the auction contract)
     error Unauthorized();
-    /// @notice Error indicating that the ERC721 token is not owned by this contract
-    error TokenNotOwned();
-    /// @notice Error indicating that the auction is not paused
+    /// @notice Error indicating that the auction is not paused. (the token can only be withdrawn when the auction is paused)
     error AuctionNotPaused();
 
     /// @inheritdoc IRentalAuctionControllerObserver
-    function initialize(IRentalAuction rentalAuction, address owner, bytes calldata extraArgs) external virtual initializer {
-        _owner = owner;
-        _rentalAuction = rentalAuction;
-        (_tokenContract, _tokenId) = abi.decode(extraArgs, (IERC721, uint256));
+    /// @param _extraArgs ABI encoded [tokenContract, tokenId]
+    function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata _extraArgs) external virtual initializer {
+        owner = _owner;
+        rentalAuction = _rentalAuction;
+        (tokenContract, tokenId) = abi.decode(_extraArgs, (IERC721, uint256));
     }
 
     modifier onlyRentalAuction {
-        if (msg.sender != address(_rentalAuction)) revert Unauthorized();
+        if (msg.sender != address(rentalAuction)) revert Unauthorized();
         _;
     }
 
     modifier onlyOwner {
-        if (msg.sender != _owner) revert Unauthorized();
+        if (msg.sender != owner) revert Unauthorized();
         _;
     }
 
@@ -69,8 +68,8 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// @dev Only callable by the owner.
     /// @param newOwner The new owner.
     function transferOwnership(address newOwner) external onlyOwner {
-        address oldOwner = _owner;
-        _owner = newOwner;
+        address oldOwner = owner;
+        owner = newOwner;
         emit OwnershipTransferred(oldOwner, newOwner);
     }
 
@@ -78,8 +77,8 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// @dev Only callable by the owner.
     /// Reverts if the auction is not paused.
     function withdrawToken() external onlyOwner {
-        if (!_rentalAuction.paused()) revert AuctionNotPaused();
-        _tokenContract.transferFrom(address(this), msg.sender, _tokenId);
+        if (!rentalAuction.paused()) revert AuctionNotPaused();
+        tokenContract.transferFrom(address(this), msg.sender, tokenId);
         emit TokenWithdrawn();
     }
 
@@ -87,7 +86,7 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// @dev Only callable by the owner.
     /// Calls the pause function on the rental auction contract.
     function stopAuction() external onlyOwner {
-        _rentalAuction.pause();
+        rentalAuction.pause();
         emit AuctionStopped();
     }
 
@@ -97,25 +96,25 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// Calls the unpause function on the rental auction contract.
     function startAuction() external onlyOwner {
         // make sure we have the nft
-        if (_tokenContract.ownerOf(_tokenId) != address(this)) {
+        if (tokenContract.ownerOf(tokenId) != address(this)) {
             // pull in the nft
-            _tokenContract.transferFrom(_owner, address(this), _tokenId);
+            tokenContract.transferFrom(owner, address(this), tokenId);
         }
         
         // unpause auction
-        _rentalAuction.unpause();
+        rentalAuction.unpause();
 
         emit AuctionStarted();
     }
 
     /// @return The address of the ERC721 token contract
     function underlyingTokenContract() external view returns (address) {
-        return address(_tokenContract);
+        return address(tokenContract);
     }
 
     /// @return The ERC721 token id
     function underlyingTokenID() external view returns (uint256) {
-        return _tokenId;
+        return tokenId;
     }
 
     /// @notice Called by the rental auction contract when the renter has changed

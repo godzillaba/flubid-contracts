@@ -6,9 +6,15 @@ import { LensDataTypes } from "../libraries/LensDataTypes.sol";
 
 import { ERC721ControllerObserver } from "./ERC721ControllerObserver.sol";
 
-contract LensProfileControllerObserver is ERC721ControllerObserver {    
+/// @title LensProfileControllerObserver
+/// @notice Rental auction controller for Lens Profile tokens
+contract LensProfileControllerObserver is ERC721ControllerObserver {  
+    /// @notice Do nothing on renter changed  
     function _onRenterChanged(address) internal pure override {}
 
+    /// @notice Post to the Lens Hub
+    /// @dev Only callable by the current renter reported by the rental auction contract
+    /// @param postData The data to post
     function post(LensDataTypes.PostData calldata postData) external {
         if (msg.sender != rentalAuction.currentRenter()) revert Unauthorized();
         ILensHub(address(tokenContract)).post(postData);
