@@ -4,11 +4,11 @@ pragma solidity ^0.8.13;
 import "forge-std/Script.sol";
 
 import {ERC721ControllerObserver} from "../src/controllers/ERC721ControllerObserver.sol";
-import {ERC4907Metadata} from "../src/erc4907/ERC4907Metadata.sol";
+import {ERC4907} from "../test/mocks/ERC4907.sol";
 
 contract StartERC4907RentalAuction is Script {
     ERC721ControllerObserver controller = ERC721ControllerObserver(0x015d8EFE556225267Fd34b63638A9af223452468);
-    ERC4907Metadata nft = ERC4907Metadata(0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B);
+    ERC4907 nft = ERC4907(0xe1F6BD28cdff9e1bFB8CaC69664d9519F858793B);
 
     function setUp() external {}
 

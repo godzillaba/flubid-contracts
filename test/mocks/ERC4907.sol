@@ -2,16 +2,14 @@
 pragma solidity ^0.8.13;
 
 import { ERC721 } from "openzeppelin-contracts/token/ERC721/ERC721.sol";
-import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 import { IERC165 } from "openzeppelin-contracts/interfaces/IERC165.sol";
-import { IERC721Metadata } from "openzeppelin-contracts/interfaces/IERC721Metadata.sol";
-import { IERC4907, IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
+import { IERC4907 } from "../../src/interfaces/IERC4907.sol";
 
 // https://eips.ethereum.org/EIPS/eip-4907
 
 /// @title ERC4907Metadata
 /// @notice A sample implementation of ERC4907Metadata
-contract ERC4907Metadata is ERC721, IERC4907Metadata {
+contract ERC4907 is ERC721, IERC4907 {
     struct UserInfo 
     {
         address user;   // address of user role
@@ -22,8 +20,8 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
 
     string public baseURI;
 
-    constructor(string memory name_, string memory symbol_, string memory _baseURI) ERC721(name_, symbol_) {
-        baseURI = _baseURI;
+    constructor(string memory name_, string memory symbol_, string memory baseURI_) ERC721(name_, symbol_) {
+        baseURI = baseURI_;
     }
     
     /// @notice set the user and expires of an NFT
@@ -64,8 +62,6 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
     function supportsInterface(bytes4 interfaceId) public view virtual override(ERC721, IERC165) returns (bool) {
         return 
             interfaceId == type(IERC4907).interfaceId 
-            || interfaceId == type(IERC4907Metadata).interfaceId
-            || interfaceId == type(IERC721Metadata).interfaceId
             || super.supportsInterface(interfaceId);
     }
 
@@ -86,16 +82,8 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
     function mint(uint256 tokenId) external {
         _mint(msg.sender, tokenId);
     }
-
-    function name() public view override(ERC721, IERC4907Metadata) returns (string memory) {
-        return super.name();
-    }
-
-    function symbol() public view override(ERC721, IERC4907Metadata) returns (string memory) {
-        return super.symbol();
-    }
     
-    function tokenURI(uint256) public view override(ERC721, IERC4907Metadata) returns (string memory) {
+    function tokenURI(uint256) public view override returns (string memory) {
         return baseURI;
     }
 } 

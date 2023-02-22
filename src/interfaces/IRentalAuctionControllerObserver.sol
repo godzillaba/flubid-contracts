@@ -11,7 +11,7 @@ interface IRentalAuctionControllerObserver {
     function initialize(IRentalAuction _rentalAuction, address _owner, bytes calldata _extraArgs) external;
 
     /// @notice Called by the rental auction contract when the renter has changed
-    /// @dev THIS FUNCTION MUST NOT REVERT
+    /// @dev THIS FUNCTION MUST NOT REVERT IF CALLED BY THE RENTAL AUCTION CONTRACT
     /// @param newRenter The new renter
     function onRenterChanged(address newRenter) external;
 }

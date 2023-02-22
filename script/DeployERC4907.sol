@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import "forge-std/Script.sol";
 
-import { ERC4907Metadata } from "../src/erc4907/ERC4907Metadata.sol";
+import { ERC4907 } from "../test/mocks/ERC4907.sol";
 
 contract DeployERC4907 is Script {
     string baseURI = "ipfs://QmeGBX2mFZBu3JrqftnEiW5gaWaG7MHe6brsaokCWLUdzS";
@@ -17,7 +17,7 @@ contract DeployERC4907 is Script {
         
         vm.startBroadcast(privateKey);
 
-        ERC4907Metadata token = new ERC4907Metadata(name, symbol, baseURI);
+        ERC4907 token = new ERC4907(name, symbol, baseURI);
 
         token.mint(1);
 
