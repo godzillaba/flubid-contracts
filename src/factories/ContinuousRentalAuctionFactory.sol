@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { Clones } from "@openzeppelin/contracts/proxy/Clones.sol";
+import { Clones } from "openzeppelin-contracts/proxy/Clones.sol";
 
 import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperApp.sol";
@@ -13,23 +13,39 @@ import { IRentalAuction } from "../interfaces/IRentalAuction.sol";
 import { ContinuousRentalAuction } from "../ContinuousRentalAuction.sol";
 
 
+/// @title ContinuousRentalAuctionFactory
+/// @notice Deploys continuous rental auctions and controllers with the minimal clones proxy pattern.
 contract ContinuousRentalAuctionFactory {
+    /// @notice The address of the implementation of the continuous rental auction.
     address immutable implementation;
 
+    /// @notice The address of the Superfluid host.
     address immutable host;
+
+    /// @notice The address of the Superfluid CFA Contract.
     address immutable cfa;
 
-    uint256 constant configWord = SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
+    /// @notice The Superfluid config word for the continuous rental auction.
+    /// @dev We want before callbacks to be noop.
+    /// We want it to be APP_LEVEL_FINAL so downstream apps can't reenter.
+    uint256 constant configWord = SuperAppDefinitions.APP_LEVEL_FINAL |
         SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
         SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
         SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;
 
+    /// @notice Emitted when a continuous rental auction is deployed.
+    /// @param auctionAddress The address of the continuous rental auction
+    /// @param controllerObserverAddress The address of the controller observer
+    /// @param controllerObserverImplementation The address of the controller observer implementation
     event ContinuousRentalAuctionDeployed(
         address indexed auctionAddress, 
         address indexed controllerObserverAddress,
         address indexed controllerObserverImplementation
     );
 
+    /// @notice Constructor for the factory.
+    /// @param _host The address of the Superfluid host.
+    /// @param _cfa The address of the Superfluid CFA contract.
     constructor(address _host, address _cfa) {
         implementation = address(new ContinuousRentalAuction());
 
@@ -37,37 +53,47 @@ contract ContinuousRentalAuctionFactory {
         cfa = _cfa;
     }
 
+    /// @notice Deploys a continuous rental auction clone and a controller observer clone. Caller will be set as the owner of the controller.
+    /// @param acceptedToken The accepted token for the auction.
+    /// @param controllerObserverImplementation The address of the controller observer implementation.
+    /// @param beneficiary The beneficiary of the auction.
+    /// @param minimumBidFactorWad The minimum bid factor in WAD.
+    /// @param reserveRate The reserve rate.
+    /// @param controllerObserverExtraArgs ABI encoded additional arguments for the controller observer.
+    /// @return auctionClone The address of the continuous rental auction clone.
+    /// @return controllerObserverClone The address of the controller observer clone.
     function create(
-        ISuperToken _acceptedToken,
-        address _controllerObserverImplementation,
-        address _beneficiary,
-        uint96 _minimumBidFactorWad,
-        int96 _reserveRate,
-        bytes calldata _controllerObserverExtraArgs
+        ISuperToken acceptedToken,
+        address controllerObserverImplementation,
+        address beneficiary,
+        uint96 minimumBidFactorWad,
+        int96 reserveRate,
+        bytes calldata controllerObserverExtraArgs
     ) external returns (address auctionClone, address controllerObserverClone) {
-        // TODO: make sure acceptedToken is actually a supertoken
-
+        // deploy clones
         auctionClone = Clones.clone(implementation);
-        controllerObserverClone = Clones.clone(_controllerObserverImplementation);
+        controllerObserverClone = Clones.clone(controllerObserverImplementation);
 
+        // register clone as super app
         ISuperfluid(host).registerAppByFactory(ISuperApp(auctionClone), configWord);
 
+        // initialize clones
         ContinuousRentalAuction(auctionClone).initialize(
-            _acceptedToken, 
+            acceptedToken, 
             ISuperfluid(host), 
             IConstantFlowAgreementV1(cfa), 
             IRentalAuctionControllerObserver(controllerObserverClone), 
-            _beneficiary, 
-            _minimumBidFactorWad, 
-            _reserveRate
+            beneficiary, 
+            minimumBidFactorWad, 
+            reserveRate
         );
 
         IRentalAuctionControllerObserver(controllerObserverClone).initialize(
             IRentalAuction(auctionClone),
             msg.sender,
-            _controllerObserverExtraArgs
+            controllerObserverExtraArgs
         );
 
-        emit ContinuousRentalAuctionDeployed(auctionClone, controllerObserverClone, _controllerObserverImplementation);
+        emit ContinuousRentalAuctionDeployed(auctionClone, controllerObserverClone, controllerObserverImplementation);
     }
 }

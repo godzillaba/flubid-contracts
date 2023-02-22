@@ -28,12 +28,12 @@ contract CreateContinuousERC4907Auction is Script {
         vm.startBroadcast(privateKey);
 
         (address auction, address controller) = factory.create({
-            _acceptedToken: maticx,
-            _controllerObserverImplementation: erc4907ControllerObserverImpl,
-            _beneficiary: account,
-            _minimumBidFactorWad: uint96(minimumBidFactorWad),
-            _reserveRate: reserveRate,
-            _controllerObserverExtraArgs: abi.encode(erc4907, tokenId)
+            acceptedToken: maticx,
+            controllerObserverImplementation: erc4907ControllerObserverImpl,
+            beneficiary: account,
+            minimumBidFactorWad: uint96(minimumBidFactorWad),
+            reserveRate: reserveRate,
+            controllerObserverExtraArgs: abi.encode(erc4907, tokenId)
         });
 
         console.log("Auction deployed to:", auction);

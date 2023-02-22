@@ -29,12 +29,12 @@ contract CreateContinuousLensAuction is Script {
         vm.startBroadcast(privateKey);
 
         (address auction, address controller) = factory.create({
-            _acceptedToken: maticx,
-            _controllerObserverImplementation: lensControllerObserverImpl,
-            _beneficiary: account,
-            _minimumBidFactorWad: uint96(minimumBidFactorWad),
-            _reserveRate: reserveRate,
-            _controllerObserverExtraArgs: abi.encode(tokenId)
+            acceptedToken: maticx,
+            controllerObserverImplementation: lensControllerObserverImpl,
+            beneficiary: account,
+            minimumBidFactorWad: uint96(minimumBidFactorWad),
+            reserveRate: reserveRate,
+            controllerObserverExtraArgs: abi.encode(tokenId)
         });
 
         console.log("Auction deployed to:", auction);

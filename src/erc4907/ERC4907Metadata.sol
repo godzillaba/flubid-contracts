@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import { IERC4907, IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 import { ERC721 } from "openzeppelin-contracts/token/ERC721/ERC721.sol";
 import { IERC721 } from "openzeppelin-contracts/interfaces/IERC721.sol";
 import { IERC165 } from "openzeppelin-contracts/interfaces/IERC165.sol";
 import { IERC721Metadata } from "openzeppelin-contracts/interfaces/IERC721Metadata.sol";
+import { IERC4907, IERC4907Metadata } from "../interfaces/IERC4907Metadata.sol";
 
 // https://eips.ethereum.org/EIPS/eip-4907
 
+/// @title ERC4907Metadata
+/// @notice A sample implementation of ERC4907Metadata
 contract ERC4907Metadata is ERC721, IERC4907Metadata {
     struct UserInfo 
     {
@@ -96,16 +98,4 @@ contract ERC4907Metadata is ERC721, IERC4907Metadata {
     function tokenURI(uint256) public view override(ERC721, IERC4907Metadata) returns (string memory) {
         return baseURI;
     }
-
-    // function tokenURI(uint256 tokenId) public view override(ERC721, IERC4907Metadata) returns (string memory) {
-    //     ownerOf(tokenId); // reverts if tokenId is invalid
-    //     return string(abi.encodePacked(baseURI, intToString(tokenId)));
-    // }
-
-    // function intToString(uint256 x) private pure returns (string memory result) {
-    //     while (x > 0) {
-    //         result = string(abi.encodePacked(result, string(abi.encodePacked(x % 10 + 48))));
-    //         x /= 10;
-    //     }
-    // }
 } 
