@@ -360,18 +360,23 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     /// @dev The auction must be in the rental phase and the max rental duration must have passed.
     /// Delete the flow to the beneficiary.
     /// Return the deposit to the renter if they haven't reclaimed it yet.
-    /// Attempt to 
+    /// Delete the flow from the renter to the app.
     function transitionToBiddingPhase() external whenNotPaused {
         if (isBiddingPhase) revert AlreadyInBiddingPhase();
 
         if (block.timestamp < currentPhaseEndTime) revert CurrentPhaseNotEnded();
 
+        address _topBidder = topBidder;
+
         // delete flow to beneficiary (not reentrant)
         acceptedToken.deleteFlow(address(this), beneficiary);
 
+        // delete the flow from the renter
+        acceptedToken.deleteFlow(_topBidder, address(this));
+
         // return deposit (not reentrant)
         if (!depositClaimed) {
-            acceptedToken.transfer(topBidder, uint96(topFlowRate) * uint256(minRentalDuration)); 
+            acceptedToken.transfer(_topBidder, uint96(topFlowRate) * uint256(minRentalDuration)); 
         }
 
         // set state variables for beginning of bidding phase
@@ -380,21 +385,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         
         currentPhaseEndTime = 0;
         topFlowRate = 0;
-
-        // delete flow from current renter (this DOES NOT trigger afterAgreementTerminated callback) (not reentrant)
-        // THIS CAN FAIL (maybe the currentRenter revoked this app's flow operator role)
-        try host.callAgreement(
-            cfa,
-            abi.encodeCall(
-                cfa.deleteFlow,
-                (acceptedToken, topBidder, address(this), new bytes(0))
-            ),
-            new bytes(0)
-        ) {}
-        catch {
-            // the incoming flow from the currentRenter has NOT been terminated
-            // they will continue streaming into this superapp, but we ignore it and transition to bidding phase anyway
-        }
 
         if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
 
