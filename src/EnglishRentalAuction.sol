@@ -358,8 +358,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
     /// @notice Transitions the auction to the bidding phase.
     /// @dev The auction must be in the rental phase and the max rental duration must have passed.
-    /// Delete the flow to the beneficiary.
     /// Return the deposit to the renter if they haven't reclaimed it yet.
+    /// Delete the flow to the beneficiary.
     /// Delete the flow from the renter to the app.
     function transitionToBiddingPhase() external whenNotPaused {
         if (isBiddingPhase) revert AlreadyInBiddingPhase();
@@ -367,12 +367,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         if (block.timestamp < currentPhaseEndTime) revert CurrentPhaseNotEnded();
 
         address _topBidder = topBidder;
-
-        // delete flow to beneficiary (not reentrant)
-        acceptedToken.deleteFlow(address(this), beneficiary);
-
-        // delete the flow from the renter
-        acceptedToken.deleteFlow(_topBidder, address(this));
 
         // return deposit (not reentrant)
         if (!depositClaimed) {
@@ -387,6 +381,12 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         topFlowRate = 0;
 
         if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
+
+        // delete flow to beneficiary
+        acceptedToken.deleteFlow(address(this), beneficiary);
+
+        // delete the flow from the renter
+        acceptedToken.deleteFlow(_topBidder, address(this));
 
         emit TransitionedToBiddingPhase();
     }
@@ -416,9 +416,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         currentPhaseEndTime = block.timestamp + maxRentalDuration;
 
-        newCtx = acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, _ctx);
-
         if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(_topBidder);
+
+        newCtx = acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, _ctx);
         
         emit TransitionedToRentalPhase(_topBidder, _topFlowRate);
     }
@@ -457,9 +457,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         // if we are not in renting phase or msgSender is not currentRenter, then do nothing
         if (!isBiddingPhase && streamSender == _topBidder) {
             // the current renter has terminated their stream
-            
-            // delete flow to beneficiary (not reentrant)
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
             // return deposit (or part of it)
             if (!depositClaimed) {
@@ -483,6 +480,9 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             depositClaimed = false;
 
             if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
+
+            // delete flow to beneficiary
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
             emit TransitionedToBiddingPhaseEarly(_topBidder, _topFlowRate);
         }

@@ -12,6 +12,7 @@ interface IRentalAuctionControllerObserver {
 
     /// @notice Called by the rental auction contract when the renter has changed.
     /// @dev THIS FUNCTION MUST NOT REVERT IF CALLED BY THE RENTAL AUCTION CONTRACT
+    /// This function must not introduce potential reentrancy.
     /// @param newRenter The new renter
     function onRenterChanged(address newRenter) external;
 }
