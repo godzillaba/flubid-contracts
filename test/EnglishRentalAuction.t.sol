@@ -190,6 +190,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     function testFailBeneficiaryCannotBid() public {
         bid(beneficiary, reserveRate);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testSuccessfulBid(int96 flowRate) public {
@@ -224,6 +227,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
     
     // // TODO
@@ -274,6 +280,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testSecondBidCloseToDeadline(int32 flowRate1, int32 flowRate2) public {
@@ -321,6 +330,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testTransitionToRentalPhase(int96 flowRate) public {
@@ -356,6 +368,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, renter);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testTransitionToBiddingPhase(int96 flowRate) public {
@@ -395,6 +410,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, address(0));
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testRenterTerminateStreamAfterMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -445,6 +463,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, address(0));
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testRenterTerminateStreamBeforeMinimumDuration(int32 _flowRate, uint32 duration) public {
@@ -495,6 +516,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // verify callback
         assertEq(reportedRenter, address(0));
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testReclaimDeposit(int96 flowRate) public {
@@ -550,6 +574,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         vm.prank(renter);
         vm.expectRevert(bytes4(keccak256("DepositAlreadyClaimed()")));
         app.reclaimDeposit();
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testPauseFailing(int96 flowRate) public {
@@ -561,6 +588,9 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         vm.expectRevert(bytes4(keccak256("NotBiddingPhase()")));
         app.pause();
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 
     function testPauseSuccess() public {
@@ -592,5 +622,31 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(daix.getNetFlowRate(address(app)), 0);
         assertEq(daix.getNetFlowRate(bidder), 0);
         assertEq(daix.getNetFlowRate(beneficiary), 0);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
+    }
+
+    function testBeneficiaryCannotTerminateStream(int96 flowRate) public {
+        testTransitionToRentalPhase(flowRate);
+
+        // beneficiary terminates the stream
+        vm.prank(beneficiary);
+        sf.host.callAgreement(
+            sf.cfa,
+            abi.encodeCall(
+                sf.cfa.deleteFlow,
+                (daix, address(app), beneficiary, new bytes(0))
+            ),
+            new bytes(0) // userData
+        );
+
+        // make sure the stream is still there
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(vm.addr(1)), -flowRate);
+        assertEq(daix.getNetFlowRate(beneficiary), flowRate);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
     }
 }

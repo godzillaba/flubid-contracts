@@ -494,7 +494,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         address _topBidder = topBidder;
         int96 _topFlowRate = topFlowRate;
 
-        (address streamSender,) = abi.decode(_agreementData, (address,address));
+        (address streamSender, address streamReceiver) = abi.decode(_agreementData, (address,address));
+
+        if (streamReceiver == beneficiary) {
+            // the beneficiary has closed the stream from here to them
+            // we should just reopen the stream
+            return acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, newCtx);
+        }
 
         // if we are not in renting phase or msgSender is not currentRenter, then do nothing
         if (!isBiddingPhase && streamSender == _topBidder) {
