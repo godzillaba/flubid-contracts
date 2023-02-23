@@ -15,89 +15,173 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 
-/*
+/// @title ContinuousRentalAuction
 
-TODO:
+/// @notice A continuous rental auction contract that uses Superfluid streams to accept bids.
+/// While the auction is active, the contract accepts incoming streams of the accepted token as "bids".
+/// The contract keeps a doubly linked list of senders and their flow rates in ascending order.
+/// Whoever has the highest flow rate is the current renter. 
+/// Everyone else with a smaller flow rate has a stream of equal rate sent back to them.
+/// Bidders can create, update or delete streams at any time to change their bid.
 
-rename ethereum-contracts gitmodule
-*/
-
+/// @dev The state must always be consistent. Consistent state means: 
+/// The linked list is sorted in ascending order by flow rate.
+/// There is an inbound stream from `sender` of `flowRate` for every `SenderInfoListNode` in the linked list. 
+/// There is not an inbound stream from a sender that is not in the linked list. 
+/// There is not an inbound stream from the beneficiary.
+/// When the auction is paused: 
+///   All inbound streams have a matching outbound stream to the sender.
+///   There is no stream to the beneficiary.
+/// When the auction is not paused: 
+///   All senders must have a matching return stream except the top sender. 
+///   There must be no return stream to the top sender. 
+///   There must be a stream to the beneficiary matching the top sender's flow rate.
 contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
 
-    /// @dev Doubly linked list node for storing senders and their flow rates in ascending order
-    /// @dev left is the node/sender to the left, right is right
-    /// @dev if left = address(0), then it is the first item in the list
-    /// @dev similarly, if right = address(0), then it is the last item in the list
-    /// @dev no two senders can have equal flowRate
-    /// @dev all items in the list have flowRate > 0. Any ListNodes with flowRate <= 0 are not in the list.
+    /// @notice A node in the sorted doubly linked list of senders and their flow rates
+    /// @dev If `left == address(0)`, then it is the first item in the list.
+    /// Similarly, if `right == address(0)`, then it is the last item in the list
+    /// No two senders can have equal `flowRate`.
+    /// All items in the list have `flowRate > 0`. Any `SenderInfoListNode` with `flowRate <= 0` is not in the list.
+    /// @param flowRate The flow rate of the sender
+    /// @param left The sender to the left of this sender in the linked list
+    /// @param right The sender to the right of this sender in the linked list
+    /// @param sender The address of the sender
     struct SenderInfoListNode {
         int96 flowRate;
         address left;
         address right;
-
         address sender;
     }
     
+    /*******************************************************
+     * 
+     * Constant State Variables
+     * 
+     *******************************************************/
+
+    /// @notice The accepted token of the auction
     ISuperToken public acceptedToken;
+
+    /// @notice The Superfluid host
     ISuperfluid public host;
+    /// @notice The Superfluid CFA Contract
     IConstantFlowAgreementV1 public cfa;
 
+    /// @notice The controller observer contract
     IRentalAuctionControllerObserver public controllerObserver;
 
+    /// @notice The address of the auction beneficiary. They receive the proceeds of the auction.
     address public beneficiary;
 
+    /// @notice The minimum bid factor (wad). When placing a bid, it must be at least this factor times the next highest bid.
     uint256 public minimumBidFactorWad;
+
+    /// @notice The reserve rate. The auction will not accept streams with a flow rate lower than this.
+    int96 public reserveRate;
+
+    /// @dev Wad constant
     uint256 constant _wad = 1e18;
 
-    /// @dev mapping containing linked list of senders' flow rates in ascending order
+    /*******************************************************
+     * 
+     * Non-constant State Variables
+     * 
+     *******************************************************/
+
+    /// @notice Each sender's `SenderInfoListNode` in the linked list
     mapping(address => SenderInfoListNode) public senderInfo;
 
-    /// @dev The sender of the stream with the highest flowrate. Marks right of linked list. When 0 there are now incoming streams
-    address public topStreamer;
+    /// @notice The sender of the stream with the highest flowrate. 
+    /// Marks right of linked list. When 0 there are no incoming streams.
+    address public topSender;
 
+    /// @notice Whether the auction is paused
     bool public paused;
 
-    int96 public reserveRate;
-    
-    // todo get rid of this
-    event Initialized(
-        address indexed acceptedToken, 
-        address indexed controllerObserver, 
-        address indexed beneficiary,
-        uint96 minimumBidFactorWad,
-        int96 reserveRate
-    );
+    /*******************************************************
+     * 
+     * Events
+     * 
+     *******************************************************/
 
+    /// @notice Emitted when the renter changes
+    /// @param oldRenter The previous renter
+    /// @param newRenter The new renter
     event RenterChanged(address indexed oldRenter, address indexed newRenter);
-    event NewInboundStream(address indexed streamer, int96 flowRate);
-    event StreamUpdated(address indexed streamer, int96 flowRate);
-    event StreamTerminated(address indexed streamer);
 
+    /// @notice Emitted when a new stream is sent to this contract
+    /// @param sender The address of the sender
+    /// @param flowRate The flow rate of the stream
+    event NewInboundStream(address indexed sender, int96 flowRate);
+
+    /// @notice Emitted when an inbound stream is updated
+    /// @param sender The address of the sender
+    /// @param flowRate The new flow rate of the stream
+    event StreamUpdated(address indexed sender, int96 flowRate);
+
+    /// @notice Emitted when an inbound stream is terminated
+    /// @param sender The address of the sender
+    event StreamTerminated(address indexed sender);
+
+    /// @notice Emitted when the auction is paused
     event Paused();
+    
+    /// @notice Emitted when the auction is unpaused
     event Unpaused();
 
-    /// @dev Thrown when the callback caller is not the host.
+    /*******************************************************
+     * 
+     * Errors
+     * 
+     *******************************************************/
+
+    /// @notice Error indicating that a SuperApp callback was called from an address other than the Superfluid host.
     error Unauthorized();
 
-    /// @dev Thrown when the token being streamed to this contract is invalid
+    /// @notice Thrown when the token being streamed into this app is not the accepted token.
     error InvalidToken();
 
-    /// @dev Thrown when the agreement is other than the Constant Flow Agreement V1
+    /// @notice Thrown when the agreement is other than the Constant Flow Agreement V1
     error InvalidAgreement();
 
+    /// @notice Error indicating that the flow rate is too low.
+    /// @dev Thrown if the linked list position provided is incorrect.
+    /// Thrown if the flow rate is lower than the reserve rate.
+    /// Thrown if the linked list position is correct, but the flow rate is lower than the minimum bid factor times the flow rate to the left.
     error FlowRateTooLow();
+
+    /// @notice Error indicating that the flow rate is too low.
+    /// @dev Thrown if the linked list position provided is incorrect.
     error FlowRateTooHigh();
 
+    /// @notice Error indicating that the provided linked list position points to an invalid node.
     error InvalidRight();
 
+    /// @notice Error indicating that the auction is paused.
     error IsPaused();
+    /// @notice Error indicating that the auction is not paused.
     error IsNotPaused();
 
+    /// @notice Thrown when the beneficiary tries to bid.
     error BeneficiaryCannotBid();
 
+    /*******************************************************
+     * 
+     * Initialization
+     * 
+     *******************************************************/
 
+    /// @notice Initializes the auction contract
+    /// @param _acceptedToken The accepted token of the auction
+    /// @param _host The Superfluid host
+    /// @param _cfa The Superfluid CFA Contract
+    /// @param _controllerObserver The controller observer contract
+    /// @param _beneficiary The address of the auction beneficiary. They receive the proceeds of the auction.
+    /// @param _minimumBidFactorWad The minimum bid factor (wad). When placing a bid, it must be at least this factor times the next highest bid.
+    /// @param _reserveRate The reserve rate. The auction will not accept streams with a flow rate lower than this.
     function initialize(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
@@ -111,8 +195,10 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
 
-        // require(_minimumBidFactorWad < uint256(type(uint160).max)); // prevent overflow (TODO: why is this here it makes no sense)
+        // the minimum bid factor must be at least 1
         require(_minimumBidFactorWad >= _wad);
+
+        // the reserve rate cannot be negative
         require(_reserveRate >= 0);
 
         acceptedToken = _acceptedToken;
@@ -126,10 +212,15 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         minimumBidFactorWad = _minimumBidFactorWad;
         reserveRate = _reserveRate;
 
+        // start the auction off paused
         paused = true;
-        
-        emit Initialized(address(_acceptedToken), address(_controllerObserver), _beneficiary, _minimumBidFactorWad, _reserveRate);
     }
+
+    /*******************************************************
+     * 
+     * Modifiers
+     * 
+     *******************************************************/
 
     modifier onlyHost() {
         if (msg.sender != address(host)) revert Unauthorized();
@@ -157,10 +248,26 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         _;
     }
 
-    function currentRenter() public view returns (address) {
-        return paused ? address(0) : topStreamer;
-    }
+    /*******************************************************
+     * 
+     * SuperApp callbacks
+     * 
+     *******************************************************/
 
+    /// @notice Called by the Superfluid host after a stream to this contract is created.
+    /// @dev This function will place the sender in the linked list assuming the basic requirements are met.
+    /// The flow sender must include the correct linked list position 
+    /// (sender to their right, or 0 if they are the highest) in the userData when creating the stream.
+    /// If the sender is not the highest bidder, a flow of equal rate will be sent back to them.
+    /// If the sender is the highest bidder:
+    /// 1. The flow to the beneficiary will be updated to be of equal rate.
+    /// 2. A flow will be created to the previous highest bidder if there is one.
+    /// 3. The controller will be notified of the new renter via `onRenterChanged`.
+    /// @param _superToken The SuperToken being streamed
+    /// @param _agreementClass The agreement class of the stream
+    /// @param _agreementData The agreement data of the stream
+    /// @param _ctx The Superfluid context
+    /// @return newCtx The new Superfluid context
     function afterAgreementCreated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -176,27 +283,32 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         whenNotPaused
         returns (bytes memory newCtx)
     {
-        // it is not possible that stream sender already has a stream to this app
-
+        // we have to keep track of context in SuperApp callbacks
         newCtx = _ctx;
         
+        // decode the agreement data to get the sender
         (address streamSender,) = abi.decode(_agreementData, (address,address));
 
+        // the beneficiary is not allowed to bid
         if (streamSender == beneficiary) revert BeneficiaryCannotBid();
 
+        // get the flow rate
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
+        // make sure the flow rate is at least the reserve rate
         if (inFlowRate < reserveRate) revert FlowRateTooLow();
 
+        // decode the userData to get the linked list position
         (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
-        address oldRenter = topStreamer;
+        // keep track of the old renter before we update the linked list
+        address oldRenter = topSender;
 
+        // update the linked list
         _insertSenderInfoListNode(inFlowRate, streamSender, rightAddress);
 
+        // if rightAddress is 0, this is the new top sender
         if (rightAddress == address(0)) {
-            // this is the new top streamer
-
             if (oldRenter == address(0)) {
                 // this is the first stream
                 // create flow to beneficiary
@@ -205,18 +317,17 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             else {
                 // update flow rate to beneficiary
                 newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
-                // create stream to old top streamer
+                // create stream to old top sender
                 newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
             }
 
             // notify controller
             if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(streamSender);
 
-            // emit Event
             emit RenterChanged(oldRenter, streamSender);
         }
         else {
-            // this is not the top streamer
+            // this is not the top sender
 
             // send a stream of equal rate back to sender
             newCtx = acceptedToken.createFlowWithCtx(streamSender, inFlowRate, newCtx);
@@ -225,6 +336,19 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         emit NewInboundStream(streamSender, inFlowRate);
     }
 
+    /// @notice Called by the Superfluid host after a stream to this contract is updated.
+    /// @dev This function will update the sender in the linked list assuming the basic requirements are met.
+    /// The flow sender must include the correct linked list position
+    /// (sender to their right, or 0 if they are the highest) in the userData when updating the stream.
+    /// There are three cases of the sender's position in the linked list:
+    /// 1. `top -> top`: update the flow rate to the beneficiary with new rate
+    /// 2. `not top -> not top`: update the flow rate to the sender with new rate
+    /// 3. `not top -> top` or `top -> not top`: create flow to previous top, create flow to new top, update flow to beneficiary
+    /// @param _superToken The SuperToken being streamed
+    /// @param _agreementClass The agreement class of the stream
+    /// @param _agreementData The agreement data of the stream
+    /// @param _ctx The Superfluid context
+    /// @return newCtx The new Superfluid context
     function afterAgreementUpdated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -251,45 +375,30 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         (address rightAddress) = abi.decode(host.decodeCtx(_ctx).userData, (address));
         
-        address oldRenter = topStreamer;
+        address oldRenter = topSender;
 
         _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
-
-        /*
-        There are 4 scenarios:
-        1. top -> top
-            updateFlow to beneficiary with new rate
-        2. non top -> non top
-            updateFlow to sender with new rate
-        3. top -> non top
-            createFlow to old top
-            deleteFlow to new top
-            updateFlow to beneficiary with new top flow
-        4. non top -> top
-            createFlow to old top
-            deleteFlow to new top
-            updateFlow to beneficiary with new top flow
-        */
         
-        // scenario 3 and 4 are the same
-        if (oldRenter != topStreamer) {
+        // scenario 3
+        if (oldRenter != topSender) {
             // create flow to old top
             newCtx = acceptedToken.createFlowWithCtx(oldRenter, senderInfo[oldRenter].flowRate, newCtx);
 
             // delete flow to new top
-            newCtx = acceptedToken.deleteFlowWithCtx(address(this), topStreamer, newCtx);
+            newCtx = acceptedToken.deleteFlowWithCtx(address(this), topSender, newCtx);
 
             // update flow to beneficiary
-            int96 newTopRate = senderInfo[topStreamer].flowRate;
+            int96 newTopRate = senderInfo[topSender].flowRate;
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
             // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(topStreamer);
+            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(topSender);
 
-            emit RenterChanged(oldRenter, topStreamer);
+            emit RenterChanged(oldRenter, topSender);
         }
-        // scenario 1 (oldRenter == topStreamer here)
+        // scenario 1 (oldRenter == topSender here)
         else if (streamSender == oldRenter) {
+            // update flow to beneficiary
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, inFlowRate, newCtx);
         } 
         // scenario 2
@@ -301,6 +410,17 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         emit StreamUpdated(streamSender, inFlowRate);
     }
 
+    /// @notice Called by the Superfluid host when a stream a stream to or from this contract is terminated by someone other than this contract.
+    /// @dev This function cannot revert per Superfluid's requirements.
+    /// There are three scenarios:
+    /// 1. The beneficiary deleted the stream from this app: Pause the auction and create a return flow to the top sender.
+    /// 2. A bidder deleted the return stream from this app: Remove the sender from the linked list and delete the inbound flow from the bidder.
+    /// 3. A bidder deleted their stream to this app: Remove the sender from the linked list. Modify streams accordingly.
+    /// @param _superToken The SuperToken being streamed
+    /// @param _agreementClass The agreement class of the stream
+    /// @param _agreementData The agreement data of the stream
+    /// @param _ctx The Superfluid context
+    /// @return newCtx The new Superfluid context
     function afterAgreementTerminated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -314,18 +434,20 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             return _ctx;
         }
 
+        // keep track of context in SuperApp callbacks
         newCtx = _ctx;
+        // decode agreement data to get stream sender and receiver
         (address streamSender, address streamReceiver) = abi.decode(_agreementData, (address,address));
 
         if (streamSender == address(this) && streamReceiver == beneficiary) {
             // the beneficiary has cancelled the stream from the app
             // we should pause
             paused = true;
-            address _topStreamer = topStreamer;
+            address _topSender = topSender;
 
-            if (_topStreamer != address(0)) {
-                // we need to send a return stream to the top streamer
-                newCtx = acceptedToken.createFlowWithCtx(_topStreamer, senderInfo[_topStreamer].flowRate, newCtx);
+            if (_topSender != address(0)) {
+                // we need to send a return stream to the top sender
+                newCtx = acceptedToken.createFlowWithCtx(_topSender, senderInfo[_topSender].flowRate, newCtx);
             }
             
             emit Paused();
@@ -341,14 +463,14 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             return acceptedToken.deleteFlowWithCtx(streamReceiver, address(this), newCtx); 
         }
 
-        address oldRenter = topStreamer;
+        address oldRenter = topSender;
 
         // remove from linked list
         _removeSenderInfoListNode(streamSender);
 
-        address newTopStreamer = topStreamer;
+        address newTopSender = topSender;
 
-        if (newTopStreamer == address(0)) {
+        if (newTopSender == address(0)) {
             // deleted stream was the top and there are now no incoming streams
 
             if (paused) {
@@ -366,7 +488,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
             emit RenterChanged(oldRenter, address(0));
         }
-        else if (oldRenter != newTopStreamer) {
+        else if (oldRenter != newTopSender) {
             // deleted stream was the top and a new top has been chosen
 
             if (paused) {
@@ -376,16 +498,16 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             }
             else {
                 // remove return stream to new top
-                newCtx = acceptedToken.deleteFlowWithCtx(address(this), newTopStreamer, newCtx);
+                newCtx = acceptedToken.deleteFlowWithCtx(address(this), newTopSender, newCtx);
 
                 // update beneficiary stream
-                newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopStreamer].flowRate, newCtx);
+                newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopSender].flowRate, newCtx);
 
                 // notify controller
-                if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(newTopStreamer);
+                if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(newTopSender);
             }
 
-            emit RenterChanged(oldRenter, newTopStreamer);
+            emit RenterChanged(oldRenter, newTopSender);
         }
         else {
             // deleted stream was not the top
@@ -403,32 +525,36 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
      * 
      *******************************************************/
 
+    /// @notice Called by the controller to pause the auction
+    /// @dev If there are any inbound streams, delete the beneficiary stream and create a return stream to the top sender.
     function pause() external onlyController whenNotPaused {
         paused = true;
-        address _topStreamer = topStreamer;
+        address _topSender = topSender;
 
-        if (_topStreamer != address(0)) {
+        if (_topSender != address(0)) {
             // delete beneficiary stream
             acceptedToken.deleteFlow(address(this), beneficiary);
 
-            // we need to send a return stream to the top streamer
-            acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
+            // we need to send a return stream to the top sender
+            acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
         }
 
         emit Paused();
     }
 
+    /// @notice Called by the controller to unpause the auction
+    /// @dev If there are any inbound streams, delete the return stream to the top sender and create a beneficiary stream.
     function unpause() external onlyController whenPaused {
         paused = false;
 
-        address _topStreamer = topStreamer;
+        address _topSender = topSender;
 
-        if (_topStreamer != address(0)) {
-            // we need to send a return stream to the top streamer
-            acceptedToken.deleteFlow(address(this), _topStreamer);
+        if (_topSender != address(0)) {
+            // we need to send a return stream to the top sender
+            acceptedToken.deleteFlow(address(this), _topSender);
 
             // we need to create flow to beneficiary
-            acceptedToken.createFlow(_topStreamer, senderInfo[_topStreamer].flowRate);
+            acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
         }
 
         emit Unpaused();
@@ -440,12 +566,11 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
      * 
      *******************************************************/
 
-    function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
-        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
-    }
-
-    // assumes that sender already exists in the list
-    // TODO: newRate -> _newRate
+    /// @notice Updates/moves an existing node in the linked list
+    /// @dev This function assumes that the node exists in the list
+    /// @param newRate The new flow rate
+    /// @param sender The sender address
+    /// @param right The address of the sender to the right of where the node should move to
     function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
         SenderInfoListNode storage node = senderInfo[sender];
         address left = node.left;
@@ -462,7 +587,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         }
     }
 
-    // assumes that sender exists in the list
+    /// @notice Removes a node from the linked list
+    /// @dev This function assumes that the node exists in the list
+    /// @param sender The sender address
     function _removeSenderInfoListNode(address sender) internal {
         SenderInfoListNode storage center = senderInfo[sender];
 
@@ -474,8 +601,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             senderInfo[center.right].left = center.left;
         }
         else {
-            // this is topStreamer
-            topStreamer = center.left;
+            // this is topSender
+            topSender = center.left;
         }
 
         assembly {
@@ -487,13 +614,17 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         }
     }
 
-    // assumes that newSender is not already in the list
+    /// @notice Inserts a new node into the linked list
+    /// @dev This function assumes that the node does not exist in the list
+    /// @param newRate The new flow rate
+    /// @param newSender The sender address
+    /// @param right The address of the sender to the right of where the node should be inserted
     function _insertSenderInfoListNode(int96 newRate, address newSender, address right) internal {
         address left;
         if (right == address(0)) {
-            left = topStreamer;
+            left = topSender;
 
-            topStreamer = newSender;
+            topSender = newSender;
         }
         else {
             SenderInfoListNode storage rightNode = senderInfo[right];
@@ -523,5 +654,24 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         newNode.right = right;
         newNode.sender = newSender;
         newNode.flowRate = newRate;
+    }
+
+    /*******************************************************
+     * 
+     * View functions
+     * 
+     *******************************************************/
+
+    /// @return The address of the current renter
+    /// @dev Returns 0 if the auction is paused
+    function currentRenter() external view returns (address) {
+        return paused ? address(0) : topSender;
+    }
+
+    /// @return `upper > lower * minimumBidFactor`
+    /// @param upper The supposedly higher bid
+    /// @param lower The supposedly lower bid
+    function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
+        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 }
