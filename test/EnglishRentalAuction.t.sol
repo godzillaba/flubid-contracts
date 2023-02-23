@@ -386,6 +386,24 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         reportedRenter = reportedRenterPlaceholder;
 
+        // revoke flow operator permission, make sure it still works
+        (,uint8 permission,) = sf.cfa.getFlowOperatorData(daix, renter, address(app));
+        assertEq(permission, 7);
+
+        vm.prank(renter);
+        sf.host.callAgreement(
+            sf.cfa,
+            abi.encodeWithSelector(
+                sf.cfa.revokeFlowOperatorWithFullControl.selector,
+                daix,
+                address(app),
+                ""
+            ),
+            new bytes(0)
+        );        
+        (,permission,) = sf.cfa.getFlowOperatorData(daix, renter, address(app));
+        assertEq(permission, 0);
+
         app.transitionToBiddingPhase();
 
         // verify app's state variables

@@ -15,8 +15,19 @@ import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable
 import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 
-// TODO: optimize storage and just generally
 
+/// @title EnglishRentalAuction
+/// @notice An english rental auction that takes payment in Superfluid streams.
+/// The auction has two phases: bidding and rental. 
+/// During the bidding phase anyone (except the auction beneficiary) 
+/// can place a flow rate bid if it is at least the reserve rate and at least `minimumBidFactorWad` times the current top bid.
+/// When a bid is placed, a deposit of SuperTokens is taken from the bidder and held by the auction contract (`flowRate * minRentalDuration`).
+/// When the bidding phase ends, the auction transitions to the rental phase.
+/// Transitioning to the rental phase starts a stream from the top bidder to the auction contract 
+/// as well as a stream from the auction contract to the beneficiary at the top bid rate.
+/// If the renter does not close their stream before the minimum rental duration elapses, they can get their deposit back.
+/// If the renter closes their stream before the minimum rental duration elapses, a portion of their deposit is sent to the beneficiary.
+/// Once the maximum rental duration elapses, the auction transitions back to the bidding phase.
 contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     // SuperToken library setup
     using SuperTokenV1Library for ISuperToken;
@@ -28,25 +39,38 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      *******************************************************/
     uint256 constant _wad = 1e18;
 
+    /// @notice Token that is accepted by the auction
     ISuperToken public acceptedToken;
+    /// @notice The Superfluid host
     ISuperfluid public host;
+    /// @notice The Superfluid CFA contract
     IConstantFlowAgreementV1 public cfa;
 
+    /// @notice The controller observer for this auction
     IRentalAuctionControllerObserver public controllerObserver;
 
+    /// @notice The auction beneficiary. Receives the proceeds of the auction.
     address public beneficiary;
 
+    /// @notice The minimum flow rate that can be bid
     int96 public reserveRate;
 
+    /// @notice The minimum factor by which the top bid must be increased
     uint256 public minimumBidFactorWad;
 
+    /// @notice The minimum rental duration. 
+    /// Any renter that terminates their stream before this duration elapses will lose some of their deposit.
     uint64 public minRentalDuration;
+    /// @notice The maximum rental duration.
+    /// The auction can transition back to the bidding phase after this duration elapses.
     uint64 public maxRentalDuration;
 
-    // The duration of the bidding phase once the first bid has been placed
+    /// @notice The duration of the bidding phase once the first bid has been placed
     uint64 public biddingPhaseDuration;
 
-    // The duration by which the bidding phase is extended if there is a bid placed with less than `biddingPhaseExtensionDuration` time left in the bidding phase
+    /// @notice The minimum amount of time between a bid being placed and the auction transitioning to the rental phase
+    /// @dev If a bid is placed with `currentPhaseEndTime - block.timestamp < biddingPhaseExtensionDuration`,
+    /// `currentPhaseEndTime` becomes `block.timestamp + biddingPhaseExtensionDuration`
     uint64 public biddingPhaseExtensionDuration;
 
     /*******************************************************
@@ -55,18 +79,24 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
+    /// @notice Address of the top bidder (if bidding phase) or renter (if rental phase)
     address public topBidder;
+    /// @notice The top bid (if bidding phase) or rental rate (if rental phase)
     int96 public topFlowRate;
 
-    // todo: maybe gas can be optimized here by packing in some uint8 in the same slot that is 1 or something
+    /// @dev Set to 1 to save gas when transitioning phase/pausing/claiming deposit
     uint8 private __gasThingy;
+
+    /// @notice Whether the auction is paused
     bool public paused;
+
+    /// @notice Whether the auction is in the bidding phase
     bool public isBiddingPhase;
-    // has the current renter reclaimed their deposit?
+
+    /// @notice Whether the renter's deposit has been reclaimed
     bool public depositClaimed;
 
-    // timestamp at which current phase ends (if 0 then we're in the bidding phase waiting for the first bid to start the countdown)
-    // todo: using 1 instead of 0 might save gas
+    /// @notice timestamp at which current phase ends (if 0 then we're in the bidding phase waiting for the first bid to start the countdown)
     uint256 public currentPhaseEndTime;
 
     /*******************************************************
@@ -75,20 +105,41 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
     
+    /// @notice Emitted when a new top bid is placed
+    /// @param bidder The address of the bidder
+    /// @param flowRate The flow rate of the bid
     event NewTopBid(address indexed bidder, int96 flowRate);
 
+    /// @notice Emitted when the renter reclaims their deposit
+    /// @param renter The address of the renter
+    /// @param amount The amount of tokens reclaimed
     event DepositClaimed(address indexed renter, uint256 amount);
 
+    /// @notice Emitted when the auction transitions to the rental phase
+    /// @param renter The address of the renter
+    /// @param flowRate The flow rate of the rental
     event TransitionedToRentalPhase(address indexed renter, int96 flowRate);
 
+    /// @notice Emitted when the auction transitions to the bidding phase
     event TransitionedToBiddingPhase();
 
+    /// @notice Emitted when transitioning to the rental phase fails. 
+    /// The top bidder's deposit is send to the beneficiary and the bidding phase restarts.
+    /// @param topBidder The address of the top bidder
+    /// @param flowRate The flow rate of the top bid
     event TransitionToRentalPhaseFailed(address indexed topBidder, int96 flowRate);
 
+    /// @notice Emitted when the auction transitions to the bidding phase because the renter closes their stream.
+    /// @param renter The address of the renter
+    /// @param flowRate The flow rate of the rental
     event TransitionedToBiddingPhaseEarly(address indexed renter, int96 flowRate);
 
+    /// @notice Emitted when the auction is unpaused
     event Unpaused();
 
+    /// @notice Emitted when the auction is paused
+    /// @param topBidder The address of the top bidder at the time of pausing
+    /// @param flowRate The flow rate of the top bid at the time of pausing
     event Paused(address indexed topBidder, int96 flowRate);
 
     /*******************************************************
@@ -97,49 +148,35 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
-    /// @dev Thrown when the callback caller is not the host.
     error Unauthorized();
-
-    /// @dev Thrown when the token being streamed to this contract is invalid
     error InvalidToken();
-
-    /// @dev Thrown when the agreement is other than the Constant Flow Agreement V1
     error InvalidAgreement();
-
     error FlowRateTooLow();
-
     error InvalidFlowRate();
-
     error IsPaused();
     error IsNotPaused();
-
     error NotBiddingPhase();
     error NotRentalPhase();
-
     error AlreadyInRentalPhase();
     error CurrentPhaseNotEnded();
-
     error AlreadyInBiddingPhase();
-
     error DepositAlreadyClaimed();
     error TooEarlyToReclaimDeposit();
-
     error BeneficiaryCannotBid();
-
     error Unknown();
 
-    event Initialized(
-        address acceptedToken, 
-        address controllerObserver, 
-        address beneficiary,
-        uint96 minimumBidFactorWad,
-        int96 reserveRate,
-        uint64 minRentalDuration,
-        uint64 maxRentalDuration,
-        uint64 biddingPhaseDuration,
-        uint64 biddingPhaseExtensionDuration
-    );
-
+    /// @notice Initializes the auction
+    /// @param _acceptedToken The token that is accepted by the auction
+    /// @param _host The Superfluid host
+    /// @param _cfa The Superfluid CFA contract
+    /// @param _controllerObserver The controller observer for this auction
+    /// @param _beneficiary The auction beneficiary. Receives the proceeds of the auction.
+    /// @param _minimumBidFactorWad The minimum factor by which the top bid must be increased
+    /// @param _reserveRate The minimum flow rate that can be bid
+    /// @param _minRentalDuration The minimum rental duration.
+    /// @param _maxRentalDuration The maximum rental duration.
+    /// @param _biddingPhaseDuration The duration of the bidding phase once the first bid has been placed
+    /// @param _biddingPhaseExtensionDuration The minimum amount of time between a bid being placed and the auction transitioning to the rental phase
     function initialize(
         ISuperToken _acceptedToken,
         ISuperfluid _host,
@@ -191,18 +228,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         __gasThingy = 1;
         isBiddingPhase = true;
         paused = true;
-
-        emit Initialized(
-            address(_acceptedToken), 
-            address(_controllerObserver), 
-            _beneficiary,
-            _minimumBidFactorWad,
-            _reserveRate,
-            _minRentalDuration,
-            _maxRentalDuration,
-            _biddingPhaseDuration,
-            _biddingPhaseExtensionDuration
-        );
     }
 
     modifier onlyHost() {
@@ -232,64 +257,30 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     }
 
     modifier whenBiddingPhase() {
-        // TODO: make sure this is legit
         if (!isBiddingPhase || (currentPhaseEndTime > 0 && block.timestamp >= currentPhaseEndTime)) revert NotBiddingPhase();
         _;
     }
 
-    function isRentalPhase() external view returns (bool) {
-        return !isBiddingPhase;
+    /// @return The current renter. If the auction is in the bidding phase, this will return address(0).
+    function currentRenter() external view returns (address) {
+        return isBiddingPhase ? address(0) : topBidder;
     }
 
+    /// @return `upper > lower * minimumBidFactor`
+    /// @param upper The supposedly higher bid
+    /// @param lower The supposedly lower bid
     function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
         return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
-    function currentRenter() public view returns (address) {
-        return isBiddingPhase ? address(0) : topBidder;
-    }
-
-    function _placeBid(address msgSender, int96 flowRate) private {
-        // check that the flowRate is valid and higher than the last bid
-        if (flowRate <= 0) revert InvalidFlowRate();
-        if (!isBidHigher(flowRate, topFlowRate) || flowRate < reserveRate) revert FlowRateTooLow();
-        if (msgSender == beneficiary) revert BeneficiaryCannotBid();
-
-        // save this user's bid
-        int96 oldTopFlowRate = topFlowRate;
-        topFlowRate = flowRate;
-
-        // save this user's address as topBidder
-        address oldTopBidder = topBidder;
-        topBidder = msgSender;
-
-        // extend bidding period if close to the end or set it if it's the first bid
-        if (currentPhaseEndTime == 0) {
-            // this is the first bid
-            currentPhaseEndTime = block.timestamp + biddingPhaseDuration;
-        }
-        else if (currentPhaseEndTime - block.timestamp < biddingPhaseExtensionDuration) {
-            // this is not the first bid, but it is close to the end of the bidding period
-            // we should extend the bidding phase
-            currentPhaseEndTime = block.timestamp + biddingPhaseExtensionDuration;
-        }
-
-        // take deposit from new bidder
-        uint256 depositSize = uint96(flowRate) * uint256(minRentalDuration);
-        acceptedToken.transferFrom(msgSender, address(this), depositSize);
-
-        // return the deposit of the last bidder (if there is one)
-        if (oldTopFlowRate != 0) {
-            acceptedToken.transfer(oldTopBidder, uint96(oldTopFlowRate) * uint256(minRentalDuration));
-        }
-
-        emit NewTopBid(msgSender, flowRate);
-    }
-
-
     // sender should have approved this contract to spend acceptedToken and manage streams for them
     // will revert if it is not approved for ERC20 transfer
     // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.
+
+    /// @notice Places a bid. This function is only callable by the Superfluid host.
+    /// @param flowRate The flow rate of the bid
+    /// @param _ctx The Superfluid context
+    /// @return The Superfluid context
     function placeBid(int96 flowRate, bytes calldata _ctx) external onlyHost whenBiddingPhase whenNotPaused returns (bytes memory) {
         address msgSender = host.decodeCtx(_ctx).msgSender;
         
@@ -297,11 +288,17 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         return _ctx;
     }
+
+    /// @notice Places a bid.
+    /// @param flowRate The flow rate of the bid
     function placeBid(int96 flowRate) external whenBiddingPhase whenNotPaused {
         _placeBid(msg.sender, flowRate);
     }
 
-    function reclaimDeposit() external whenNotPaused {
+    /// @notice Reclaim rental/bid deposit
+    /// This function can only be called by the current renter.
+    /// The minimum rental duration must have passed.
+    function reclaimDeposit() external {
         if (isBiddingPhase) revert NotRentalPhase();
 
         address _topBidder = topBidder;
@@ -321,52 +318,14 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         emit DepositClaimed(_topBidder, depositSize);
     }
 
-    // starting state in rental phase:
-    //     the renter is streaming to app
-    //     there may be other incoming streams to the app
-    //     app is streaming to beneficiary
-
-    //     currentRenter = renter
-    //     topFlowRate = renter's flow rate
-    //     paused = false
-    //     depositClaimed = false
-    //     currentPhaseEndTime = time at which rental expires and bidding can start again
-
-    // ending state in rental phase:
-    //     the renter is streaming to app
-    //     there may be other incoming streams to the app
-    //     app is streaming to beneficiary
-
-    //     currentRenter = renter
-    //     topFlowRate = renter's flow rate
-    //     paused = false
-    //     depositClaimed = true or false
-    //     currentPhaseEndTime = time at which rental expires and bidding can start again
-
-    // starting state in bidding phase:
-    //     app is NOT streaming to beneficiary
-    //     there may be some incoming streams to the app
-
-    //     currentRenter = undefined? (or 0x00?)
-    //     topFlowRate = 0
-    //     paused = false
-    //     depositClaimed = false
-    //     currentPhaseEndTime = 0
-
-    // ending state in bidding phase:
-    //     app is NOT streaming to beneficiary
-    //     there may be some incoming streams to the app
-
-    //     currentRenter = the next renter
-    //     topFlowRate = next renter's rate
-    //     paused = false
-    //     depositClaimed = false
-    //     currentPhaseEndTime = time at which bidding ended
-
-    function transitionToRentalPhase() external whenNotPaused {
+    /// @notice Transitions the auction to the rental phase.
+    /// @dev The auction must not be in the rental phase and the current phase must have ended.
+    /// We try to create a flow from the top bidder to the app. If it fails, we take their deposit and restart the bidding phase.
+    /// If it succeeds, we transition to the rental phase.
+    function transitionToRentalPhase() external {
         if (!isBiddingPhase) revert AlreadyInRentalPhase();
 
-        // if currentPhaseEndTime > 0 then topFlowRate and currentRenter must be set correctly
+        // if we haven't gotten any bids yet or the bidding phase hasn't ended yet, revert
         if (currentPhaseEndTime == 0 || block.timestamp < currentPhaseEndTime) revert CurrentPhaseNotEnded();
 
         // try create flow from renter to app
@@ -382,7 +341,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             ),
             new bytes(0)
         ) {
-            // afterAgreementCreated is triggered, which does the state transition to the renting phase
+            // afterAgreementCreated is triggered, which does the state transition to the renting phase.
+            // we have to create the beneficiary flow in the callback. If we try to do it here it won't work.
         }
         catch {
             // send their deposit to beneficiary
@@ -394,10 +354,13 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
             emit TransitionToRentalPhaseFailed(_topBidder, _topFlowRate);
         }
-
-        // todo: explore how to pay the caller of this function (maybe with the deposit?)
     }
 
+    /// @notice Transitions the auction to the bidding phase.
+    /// @dev The auction must be in the rental phase and the max rental duration must have passed.
+    /// Delete the flow to the beneficiary.
+    /// Return the deposit to the renter if they haven't reclaimed it yet.
+    /// Attempt to 
     function transitionToBiddingPhase() external whenNotPaused {
         if (isBiddingPhase) revert AlreadyInBiddingPhase();
 
@@ -418,7 +381,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         currentPhaseEndTime = 0;
         topFlowRate = 0;
 
-        // delete flow from current renter (for some reason this DOES NOT trigger afterAgreementTerminated callback) (not reentrant)
+        // delete flow from current renter (this DOES NOT trigger afterAgreementTerminated callback) (not reentrant)
         // THIS CAN FAIL (maybe the currentRenter revoked this app's flow operator role)
         try host.callAgreement(
             cfa,
@@ -430,8 +393,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         ) {}
         catch {
             // the incoming flow from the currentRenter has NOT been terminated
-            // they will continue streaming into this superapp, but we transition to bidding phase anyway
-            // TODO: there is a function where anyone can send acceptedToken stuck in this contract to the beneficiary (be sure to account for legit deposits)
+            // they will continue streaming into this superapp, but we ignore it and transition to bidding phase anyway
         }
 
         if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
@@ -568,4 +530,90 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         emit Unpaused();
     }
+
+    /*******************************************************
+     * 
+     * Private functions
+     * 
+     *******************************************************/
+
+    function _placeBid(address msgSender, int96 flowRate) private {
+        // check that the flowRate is valid and higher than the last bid
+        if (flowRate <= 0) revert InvalidFlowRate();
+        if (!isBidHigher(flowRate, topFlowRate) || flowRate < reserveRate) revert FlowRateTooLow();
+        if (msgSender == beneficiary) revert BeneficiaryCannotBid();
+
+        // save this user's bid
+        int96 oldTopFlowRate = topFlowRate;
+        topFlowRate = flowRate;
+
+        // save this user's address as topBidder
+        address oldTopBidder = topBidder;
+        topBidder = msgSender;
+
+        // extend bidding period if close to the end or set it if it's the first bid
+        if (currentPhaseEndTime == 0) {
+            // this is the first bid
+            currentPhaseEndTime = block.timestamp + biddingPhaseDuration;
+        }
+        else if (currentPhaseEndTime - block.timestamp < biddingPhaseExtensionDuration) {
+            // this is not the first bid, but it is close to the end of the bidding period
+            // we should extend the bidding phase
+            currentPhaseEndTime = block.timestamp + biddingPhaseExtensionDuration;
+        }
+
+        // take deposit from new bidder
+        uint256 depositSize = uint96(flowRate) * uint256(minRentalDuration);
+        acceptedToken.transferFrom(msgSender, address(this), depositSize);
+
+        // return the deposit of the last bidder (if there is one)
+        if (oldTopFlowRate != 0) {
+            acceptedToken.transfer(oldTopBidder, uint96(oldTopFlowRate) * uint256(minRentalDuration));
+        }
+
+        emit NewTopBid(msgSender, flowRate);
+    }
+
+
+    // starting state in rental phase:
+    //     the renter is streaming to app
+    //     there may be other incoming streams to the app
+    //     app is streaming to beneficiary
+
+    //     topBidder = renter
+    //     topFlowRate = renter's flow rate
+    //     paused = false
+    //     depositClaimed = false
+    //     currentPhaseEndTime = time at which rental expires and bidding can start again
+
+    // ending state in rental phase:
+    //     the renter is streaming to app
+    //     there may be other incoming streams to the app
+    //     app is streaming to beneficiary
+
+    //     topBidder = renter
+    //     topFlowRate = renter's flow rate
+    //     paused = false
+    //     depositClaimed = true or false
+    //     currentPhaseEndTime = time at which rental expires and bidding can start again
+
+    // starting state in bidding phase:
+    //     app is NOT streaming to beneficiary
+    //     there may be some incoming streams to the app (not in the normal case though)
+
+    //     topBidder = undefined
+    //     topFlowRate = 0
+    //     paused = false
+    //     depositClaimed = false
+    //     currentPhaseEndTime = 0
+
+    // ending state in bidding phase:
+    //     app is NOT streaming to beneficiary
+    //     there may be some incoming streams to the app
+
+    //     currentRenter = the next renter
+    //     topFlowRate = next renter's rate
+    //     paused = false
+    //     depositClaimed = false
+    //     currentPhaseEndTime = time at which bidding ended
 }

@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 /// @title IRentalAuction
-/// @notice Interface for RentalAuction contracts
-/// Controllers expect a RentalAuction contract to implement this interface
+/// @notice Interface for RentalAuction contracts.
+/// Controllers expect a RentalAuction contract to implement this interface.
 interface IRentalAuction {
     /// @notice Pause the auction.
     function pause() external;
