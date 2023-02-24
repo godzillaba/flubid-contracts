@@ -261,27 +261,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         _;
     }
 
-    /// @return The current renter. If the auction is in the bidding phase, this will return address(0).
-    function currentRenter() external view returns (address) {
-        return isBiddingPhase ? address(0) : topBidder;
-    }
-
-    /// @return `upper > lower * minimumBidFactor`
-    /// @param upper The supposedly higher bid
-    /// @param lower The supposedly lower bid
-    function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
-        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
-    }
-
-    /// @inheritdoc IRentalAuction
-    function isJailed() external view override returns (bool) {
-        return host.isAppJailed(this);
-    }
-
-    // sender should have approved this contract to spend acceptedToken and manage streams for them
-    // will revert if it is not approved for ERC20 transfer
-    // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.
-
     /// @notice Places a bid. This function is only callable by the Superfluid host.
     /// @param flowRate The flow rate of the bid
     /// @param _ctx The Superfluid context
@@ -396,6 +375,10 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         emit TransitionedToBiddingPhase();
     }
 
+    /// @dev Called after a stream is created from the winning bidder. 
+    /// Transition to the renting phase and create a stream to the beneficiary.
+    /// Can technically be called whenever any stream is created to this app, but it will revert if this contract didn't initiate the stream.
+    /// @param _ctx The Superfluid context
     function afterAgreementCreated(
         ISuperToken /*superToken*/,
         address /*agreementClass*/,
@@ -428,9 +411,10 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         emit TransitionedToRentalPhase(_topBidder, _topFlowRate);
     }
 
-
-    
-
+    /// @dev Called after a stream to or from this app is terminated. 
+    /// If the stream from the app to the beneficiary is terminated, reopen the stream.
+    /// If the stream from the renter to the app is terminated, transition to the bidding phase (possibly taking some of their deposit).    
+    /// Otherwise, do nothing.
     function afterAgreementTerminated(
         ISuperToken _superToken,
         address _agreementClass,
@@ -499,6 +483,8 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
+    /// @notice Pause the auction. Can only be called by the controller while in the bidding phase.
+    /// @dev If there is some bidder, they will be refunded their deposit.
     function pause() external onlyController whenNotPaused whenBiddingPhase {
         paused = true;
 
@@ -520,6 +506,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         emit Paused(_topBidder, _topFlowRate);
     }
 
+    /// @notice Unpause the auction. Can only be called by the controller.
     function unpause() external onlyController whenPaused {
         paused = false;
 
@@ -532,6 +519,11 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
      * 
      *******************************************************/
 
+    /// @notice Place a bid. Sender should have approved this contract to spend acceptedToken and manage streams for them.
+    /// @dev Will revert if it is not approved for SuperToken transfer.
+    /// Will NOT revert if it is not authorized to manage flows, if `msgSender` wins the auction their deposit will be taken.
+    /// @param msgSender The account that is bidding
+    /// @param flowRate The flow rate to bid
     function _placeBid(address msgSender, int96 flowRate) private {
         // check that the flowRate is valid and higher than the last bid
         if (flowRate <= 0) revert InvalidFlowRate();
@@ -568,6 +560,29 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         }
 
         emit NewTopBid(msgSender, flowRate);
+    }
+
+    /*******************************************************
+     * 
+     * View functions
+     * 
+     *******************************************************/
+
+    /// @return The current renter. If the auction is in the bidding phase, this will return address(0).
+    function currentRenter() external view returns (address) {
+        return isBiddingPhase ? address(0) : topBidder;
+    }
+
+    /// @return `upper > lower * minimumBidFactor`
+    /// @param upper The supposedly higher bid
+    /// @param lower The supposedly lower bid
+    function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
+        return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
+    }
+
+    /// @inheritdoc IRentalAuction
+    function isJailed() external view override returns (bool) {
+        return host.isAppJailed(this);
     }
 
 
