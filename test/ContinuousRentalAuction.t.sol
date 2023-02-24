@@ -845,10 +845,36 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     function testBeneficiaryClosesStream() public {
         testCreateSecondStreamLarger(100, 200);
 
+        reportedRenter = reportedRenterPlaceholder;
+
         vm.prank(beneficiary);
         daix.deleteFlow(address(app), beneficiary);
 
-        assert(app.paused());
+        // the app should just resend the stream
+
+        //// check state
+
+        (,int96 netFlowApp,,) = daix.getNetFlowInfo(address(app));
+        (,int96 netFlowBeneficiary,,) = daix.getNetFlowInfo(beneficiary);
+        (,int96 netFlowSender1,,) = daix.getNetFlowInfo(vm.addr(1));
+        (,int96 netFlowSender2,,) = daix.getNetFlowInfo(vm.addr(2));
+
+        // currentRenter
+        assertEq(app.currentRenter(), vm.addr(2));
+
+        // netFlow = 0
+        assertEq(netFlowApp, 0);
+
+        // beneficiary flow
+        assertEq(netFlowBeneficiary, 200);
+
+        assertEq(netFlowSender1, 0);
+        assertEq(netFlowSender2, -200);
+
+        // make sure onRenterChanged isn't called
+        assertEq(reportedRenter, reportedRenterPlaceholder);
+
+        assert(!app.paused());
         assert(!sf.host.isAppJailed(app));
     }
 
@@ -862,8 +888,6 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         address sender2 = vm.addr(2);
 
         vm.prank(sender1);
-        vm.expectEmit(true, false, false, false);
-        emit StreamTerminated(sender1);
         daix.deleteFlow(address(app), sender1);
 
         //// make sure onRenterChanged callback was NOT called
@@ -887,7 +911,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         assertEq(netFlowBeneficiary, 200);
 
         // deleted streamer flow
-        assertEq(netFlowSender1, 0);
+        assertEq(daix.getFlowRate(sender1, address(app)), 100);
+        assertEq(daix.getFlowRate(address(app), sender1), 100);
 
         // top streamer flow
         assertEq(netFlowSender2, -200);

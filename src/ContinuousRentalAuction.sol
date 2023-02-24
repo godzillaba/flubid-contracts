@@ -452,26 +452,15 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
         if (streamSender == address(this) && streamReceiver == beneficiary) {
             // the beneficiary has cancelled the stream from the app
-            // we should pause
-            paused = true;
-            address _topSender = topSender;
+            // we should just reopen it
 
-            if (_topSender != address(0)) {
-                // we need to send a return stream to the top sender
-                newCtx = acceptedToken.createFlowWithCtx(_topSender, senderInfo[_topSender].flowRate, newCtx);
-            }
-            
-            emit Paused();
-
-            return newCtx;
+            // if there is a stream to the beneficiary, there must be a stream from the top sender
+            return acceptedToken.createFlowWithCtx(beneficiary, senderInfo[topSender].flowRate, newCtx);
         }
         else if (streamSender == address(this)) {
             // some bidder has terminated their return stream
-            // they are necessarily not the current renter
-            // we should terminate the corresponding inbound stream and remove them from the linked list
-            _removeSenderInfoListNode(streamReceiver);
-            emit StreamTerminated(streamReceiver);
-            return acceptedToken.deleteFlowWithCtx(streamReceiver, address(this), newCtx); 
+            // we should just reopen it
+            return acceptedToken.createFlowWithCtx(streamReceiver, senderInfo[streamReceiver].flowRate, newCtx);
         }
 
         address oldTopSender = topSender;

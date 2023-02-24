@@ -5,7 +5,7 @@
   "author": "Henry <11198460+godzillaba@users.noreply.github.com>",
   "license": "MIT",
   "scripts": {
-    "test": "forge test --fork-url https://rpc.ankr.com/polygon_mumbai --fork-block-number 32356574",
+    "test": "forge test --fork-url https://rpc.ankr.com/polygon_mumbai",
     "coverage": "forge coverage --fork-url https://rpc.ankr.com/polygon_mumbai --report lcov && genhtml lcov.info -o coverage"
   }
 }
