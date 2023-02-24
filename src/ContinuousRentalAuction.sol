@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
-import { ISuperfluid, SuperAppDefinitions, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
