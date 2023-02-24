@@ -331,7 +331,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             }
 
             // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(streamSender);
+            controllerObserver.onRenterChanged(streamSender);
 
             emit RenterChanged(oldRenter, streamSender);
         }
@@ -403,7 +403,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
             // notify controller
-            if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(topSender);
+            controllerObserver.onRenterChanged(topSender);
 
             emit RenterChanged(oldRenter, topSender);
         }
@@ -495,7 +495,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
                 // notify controller
-                if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(address(0));
+                controllerObserver.onRenterChanged(address(0));
             }
 
             emit RenterChanged(oldRenter, address(0));
@@ -516,7 +516,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopSender].flowRate, newCtx);
 
                 // notify controller
-                if (address(controllerObserver) != address(0)) controllerObserver.onRenterChanged(newTopSender);
+                controllerObserver.onRenterChanged(newTopSender);
             }
 
             emit RenterChanged(oldRenter, newTopSender);
