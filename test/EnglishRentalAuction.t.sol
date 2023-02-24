@@ -88,8 +88,6 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         app = new EnglishRentalAuction();
 
-        // TODO: make sure app reverts on agreementUpdated
-
         // we want to support after creation, revert on updating, after termination
         uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL |
             SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
@@ -665,5 +663,30 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         // make sure the app isn't jailed
         assert(!sf.host.isAppJailed(app));
+    }
+
+    function testUpdateFlowFails(int96 flowRate) public {
+        testTransitionToRentalPhase(flowRate);
+
+        // try to update the flow
+        vm.prank(vm.addr(1));
+        vm.expectRevert("Unsupported callback - Before Agreement updated");
+        sf.host.callAgreement(
+            sf.cfa,
+            abi.encodeCall(
+                sf.cfa.updateFlow,
+                (daix, address(app), flowRate, new bytes(0))
+            ),
+            new bytes(0) // userData
+        );
+
+        // make sure the stream is still there
+        assertEq(daix.getNetFlowRate(address(app)), 0);
+        assertEq(daix.getNetFlowRate(vm.addr(1)), -flowRate);
+        assertEq(daix.getNetFlowRate(beneficiary), flowRate);
+
+        // make sure the app isn't jailed
+        assert(!sf.host.isAppJailed(app));
+
     }
 }
