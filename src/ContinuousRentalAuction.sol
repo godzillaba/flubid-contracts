@@ -6,7 +6,7 @@ import "forge-std/Test.sol"; // TODO: REMOVE
 
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
-import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, SuperAppDefinitions, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
@@ -27,7 +27,6 @@ import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
 /// @dev The state must always be consistent. Consistent state means: 
 /// The linked list is sorted in ascending order by flow rate.
 /// There is an inbound stream from `sender` of `flowRate` for every `SenderInfoListNode` in the linked list. 
-/// There is not an inbound stream from a sender that is not in the linked list. 
 /// There is not an inbound stream from the beneficiary.
 /// When the auction is paused: 
 ///   All inbound streams have a matching outbound stream to the sender.
@@ -168,6 +167,13 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     /// @notice Thrown when the beneficiary tries to bid.
     error BeneficiaryCannotBid();
 
+    /// @notice Thrown when a sender who is not in the linked list tries to update their stream to this app.
+    /// @dev This could happen if a sender sends a stream to this address before the auction is deployed.
+    error SenderNotInList();
+
+    /// @notice SuperApps are not allowed to bid
+    error SuperAppCannotBid();
+
     /*******************************************************
      * 
      * Initialization
@@ -292,6 +298,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         // the beneficiary is not allowed to bid
         if (streamSender == beneficiary) revert BeneficiaryCannotBid();
 
+        // super apps cannot bid
+        if (host.isApp(ISuperApp(streamSender))) revert SuperAppCannotBid();
+
         // get the flow rate
         int96 inFlowRate = acceptedToken.getFlowRate(streamSender, address(this));
 
@@ -377,7 +386,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         
         address oldRenter = topSender;
 
-        _updateSenderInfoListNode(inFlowRate, streamSender, rightAddress);
+        // update linked list
+        // if the sender is not in the list, revert. This can happen if the sender created the flow before the app was deployed
+        if (!_updateSenderInfoListNode(inFlowRate, streamSender, rightAddress)) revert SenderNotInList();
         
         // scenario 3
         if (oldRenter != topSender) {
@@ -466,7 +477,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         address oldRenter = topSender;
 
         // remove from linked list
-        _removeSenderInfoListNode(streamSender);
+        // if the sender is not in the list, do nothing. This can happen if the sender created the flow before the app was deployed
+        if (!_removeSenderInfoListNode(streamSender)) return newCtx;
 
         address newTopSender = topSender;
 
@@ -567,12 +579,15 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
      *******************************************************/
 
     /// @notice Updates/moves an existing node in the linked list
-    /// @dev This function assumes that the node exists in the list
     /// @param newRate The new flow rate
     /// @param sender The sender address
     /// @param right The address of the sender to the right of where the node should move to
-    function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal {
+    /// @return False if the node does not exist in the list, true otherwise
+    function _updateSenderInfoListNode(int96 newRate, address sender, address right) internal returns (bool) {
         SenderInfoListNode storage node = senderInfo[sender];
+
+        if (node.flowRate == 0) return false;
+
         address left = node.left;
         
         if (right == node.right) {
@@ -585,13 +600,17 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             _removeSenderInfoListNode(sender);
             _insertSenderInfoListNode(newRate, sender, right);
         }
+
+        return true;
     }
 
     /// @notice Removes a node from the linked list
-    /// @dev This function assumes that the node exists in the list
     /// @param sender The sender address
-    function _removeSenderInfoListNode(address sender) internal {
+    /// @return False if the node does not exist in the list, true otherwise
+    function _removeSenderInfoListNode(address sender) internal returns (bool) {
         SenderInfoListNode storage center = senderInfo[sender];
+
+        if (center.flowRate == 0) return false;
 
         if (center.left != address(0)) {
             senderInfo[center.left].right = center.right;
@@ -612,6 +631,8 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             sstore(center.slot, 0)
             sstore(add(center.slot, 1), 0)
         }
+
+        return true;
     }
 
     /// @notice Inserts a new node into the linked list
