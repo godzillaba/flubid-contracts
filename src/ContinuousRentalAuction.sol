@@ -695,4 +695,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
     function isBidHigher(int96 upper, int96 lower) public view returns (bool) {
         return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
+
+    /// @inheritdoc IRentalAuction
+    function isJailed() external view override returns (bool) {
+        return host.isAppJailed(this);
+    }
 }

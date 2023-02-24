@@ -43,7 +43,7 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// @notice Error indicating that the caller is not authorized. (some functions are only callable by the owner or the auction contract)
     error Unauthorized();
     /// @notice Error indicating that the auction is not paused. (the token can only be withdrawn when the auction is paused)
-    error AuctionNotPaused();
+    error AuctionNotPausedOrJailed();
 
     /// @inheritdoc IRentalAuctionControllerObserver
     /// @param _extraArgs ABI encoded [tokenContract, tokenId]
@@ -76,7 +76,7 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     /// @dev Only callable by the owner.
     /// Reverts if the auction is not paused.
     function withdrawToken() external onlyOwner {
-        if (!rentalAuction.paused()) revert AuctionNotPaused();
+        if (!(rentalAuction.paused() || rentalAuction.isJailed())) revert AuctionNotPausedOrJailed();
         tokenContract.transferFrom(address(this), msg.sender, tokenId);
         emit TokenWithdrawn();
     }

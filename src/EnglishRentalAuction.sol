@@ -273,6 +273,11 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         return uint256(uint96(upper)) > uint256(uint96(lower)) * minimumBidFactorWad / _wad;
     }
 
+    /// @inheritdoc IRentalAuction
+    function isJailed() external view override returns (bool) {
+        return host.isAppJailed(this);
+    }
+
     // sender should have approved this contract to spend acceptedToken and manage streams for them
     // will revert if it is not approved for ERC20 transfer
     // will NOT revert if it is not authorized to manage flows. if this bidder wins the auction their deposit will be taken.

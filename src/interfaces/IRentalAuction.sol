@@ -17,4 +17,7 @@ interface IRentalAuction {
     /// @return The current renter
     /// @dev Must return address(0) if the auction is paused.
     function currentRenter() external view returns (address);
+
+    /// @return True if the auction is jailed.
+    function isJailed() external view returns (bool);
 }

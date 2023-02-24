@@ -30,6 +30,7 @@ contract ERC721ControllerObserverTest is Test, IRentalAuction {
     TestControllerObserver controllerObserver;
 
     bool public paused;
+    bool public isJailed;
 
     uint256 tokenId = 1;
 
@@ -74,10 +75,22 @@ contract ERC721ControllerObserverTest is Test, IRentalAuction {
         tokenContract.transferFrom(tokenHolder, address(controllerObserver), tokenId);
 
         paused = false;
-        vm.expectRevert(bytes4(keccak256("AuctionNotPaused()")));
+        isJailed = false;
+        vm.expectRevert(bytes4(keccak256("AuctionNotPausedOrJailed()")));
         controllerObserver.withdrawToken();
 
+        uint256 snapshot = vm.snapshot();
+
         paused = true;
+        vm.expectEmit(false, false, false, false);
+        emit TokenWithdrawn();
+        controllerObserver.withdrawToken();
+
+        assertEq(tokenContract.ownerOf(tokenId), tokenHolder);
+
+        vm.revertTo(snapshot);
+
+        isJailed = true;
         vm.expectEmit(false, false, false, false);
         emit TokenWithdrawn();
         controllerObserver.withdrawToken();
