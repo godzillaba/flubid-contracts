@@ -668,6 +668,9 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
     function testPause() public {
         testCreateSecondStreamLarger(100, 200);
+
+        reportedRenter = reportedRenterPlaceholder;
+
         app.pause();
 
         //// check state
@@ -694,6 +697,8 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         assertEq(netFlowSender1, 0);
         assertEq(netFlowSender2, 0);
+
+        assertEq(reportedRenter, address(0));
     }
 
     function testFailCreateStreamWhenPaused() public {

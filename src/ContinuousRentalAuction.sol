@@ -538,6 +538,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
             // we need to send a return stream to the top sender
             acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
+
+            // notify controller
+            controllerObserver.onRenterChanged(address(0));
         }
 
         emit Paused();
@@ -556,6 +559,9 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
 
             // we need to create flow to beneficiary
             acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
+
+            // notify controller
+            controllerObserver.onRenterChanged(_topSender);
         }
 
         emit Unpaused();
