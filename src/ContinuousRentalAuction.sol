@@ -7,7 +7,7 @@ import { ISuperfluid, ISuperApp } from "superfluid-finance/contracts/interfaces/
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
-import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
+import { Initializable } from "openzeppelin-contracts/proxy/utils/Initializable.sol";
 
 import { IRentalAuctionControllerObserver } from "./interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "./interfaces/IRentalAuction.sol";
