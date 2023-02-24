@@ -28,9 +28,6 @@ import { ContinuousRentalAuction } from "../src/ContinuousRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
-// TODO: explicitly set gitmodules versions
-// todo: prevent beneficiary from placing bid (same w english)
-
 contract ContinuousRentalAuctionWithTestFunctions is ContinuousRentalAuction {
     function updateSenderInfoListNode(int96 newRate, address sender, address right) public {
         _updateSenderInfoListNode(newRate, sender, right);
@@ -98,7 +95,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
 
         app = new ContinuousRentalAuctionWithTestFunctions();
 
-        uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
+        uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL |
             SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
             SuperAppDefinitions.BEFORE_AGREEMENT_UPDATED_NOOP |
             SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;

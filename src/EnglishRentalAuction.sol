@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol"; // TODO: REMOVE
-
-
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
 import { ISuperfluid, SuperAppDefinitions, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
@@ -186,7 +183,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         uint96 _minimumBidFactorWad,
         int96 _reserveRate,
         uint64 _minRentalDuration,
-        uint64 _maxRentalDuration, // TODO: better name for this
+        uint64 _maxRentalDuration,
         uint64 _biddingPhaseDuration,
         uint64 _biddingPhaseExtensionDuration
     ) external initializer {
@@ -196,7 +193,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         require(_beneficiary != address(0));
 
-        // require(_minimumBidFactorWad < uint256(type(uint160).max));
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
 
@@ -205,8 +201,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         require(_biddingPhaseExtensionDuration > 0);
         require(_biddingPhaseDuration >= _biddingPhaseExtensionDuration);
-
-        // TODO: think more about minRentalDuration, it can't be too small. is 1 enough? if no, what is?
 
         acceptedToken = _acceptedToken;
         
@@ -393,7 +387,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         onlyHost
         returns (bytes memory newCtx)
     {
-        if (host.decodeCtx(_ctx).msgSender != address(this)) revert Unauthorized(); // todo name this
+        if (host.decodeCtx(_ctx).msgSender != address(this)) revert Unauthorized();
 
         // stream sender must be the currentRenter and we are transitioning to the rental phase
 
@@ -423,7 +417,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         bytes calldata, // _cbdata,
         bytes calldata _ctx
     ) external override onlyHost returns (bytes memory newCtx) {
-        console.log("afterAgreementTerminated");
         // According to the app basic law, we should never revert in a termination callback
         if (_superToken != acceptedToken || _agreementClass != address(cfa)) {
             // Is this necessary? could IDA trigger this?

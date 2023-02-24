@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol"; // TODO: REMOVE
-
-
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
 import { ISuperfluid, SuperAppDefinitions, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
@@ -562,7 +559,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         address _topSender = topSender;
 
         if (_topSender != address(0)) {
-            // we need to send a return stream to the top sender
+            // we need to delete the return stream to the top sender
             acceptedToken.deleteFlow(address(this), _topSender);
 
             // we need to create flow to beneficiary
@@ -668,8 +665,6 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             leftNode.right = newSender;
         }
 
-
-        // TODO: assembly
         SenderInfoListNode storage newNode = senderInfo[newSender];
         newNode.left = left;
         newNode.right = right;

@@ -28,7 +28,6 @@ import { EnglishRentalAuction } from "../src/EnglishRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
 
-// TODO: make sure it does NOT transition to bidding phase when non-renter closes their stream during rental phase
 // TODO: test events
 
 contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
@@ -92,7 +91,7 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         // TODO: make sure app reverts on agreementUpdated
 
         // we want to support after creation, revert on updating, after termination
-        uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL | // TODO: for now assume final, later figure out how to remove this requirement safely
+        uint256 configWord = SuperAppDefinitions.APP_LEVEL_FINAL |
             SuperAppDefinitions.BEFORE_AGREEMENT_CREATED_NOOP |
             SuperAppDefinitions.AFTER_AGREEMENT_UPDATED_NOOP |
             SuperAppDefinitions.BEFORE_AGREEMENT_TERMINATED_NOOP;
