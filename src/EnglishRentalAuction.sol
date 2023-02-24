@@ -229,12 +229,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         _;
     }
 
-    modifier onlyExpected(ISuperToken superToken, address agreementClass) {
-        if (superToken != acceptedToken) revert InvalidToken();
-        if (agreementClass != address(cfa)) revert InvalidAgreement();
-        _;
-    }
-
     modifier onlyController() {
         if (msg.sender != address(controllerObserver)) revert Unauthorized();
         _;
@@ -419,7 +413,6 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     ) external override onlyHost returns (bytes memory newCtx) {
         // According to the app basic law, we should never revert in a termination callback
         if (_superToken != acceptedToken || _agreementClass != address(cfa)) {
-            // Is this necessary? could IDA trigger this?
             return _ctx;
         }
 
