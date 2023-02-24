@@ -6,7 +6,7 @@ import "forge-std/Test.sol"; // TODO: REMOVE
 
 import { SuperAppBase } from "superfluid-finance/contracts/apps/SuperAppBase.sol";
 import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperTokenV1Library.sol";
-import { ISuperfluid, SuperAppDefinitions } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
+import { ISuperfluid, SuperAppDefinitions, ISuperApp } from "superfluid-finance/contracts/interfaces/superfluid/ISuperfluid.sol";
 import { ISuperToken } from "superfluid-finance/contracts/interfaces/superfluid/ISuperToken.sol";
 import { IConstantFlowAgreementV1 } from "superfluid-finance/contracts/interfaces/agreements/IConstantFlowAgreementV1.sol";
 
@@ -163,7 +163,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
     error DepositAlreadyClaimed();
     error TooEarlyToReclaimDeposit();
     error BeneficiaryCannotBid();
-    error Unknown();
+    error SuperAppCannotBid();
 
     /// @notice Initializes the auction
     /// @param _acceptedToken The token that is accepted by the auction
@@ -405,7 +405,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         onlyHost
         returns (bytes memory newCtx)
     {
-        if (host.decodeCtx(_ctx).msgSender != address(this)) revert Unknown(); // todo name this
+        if (host.decodeCtx(_ctx).msgSender != address(this)) revert Unauthorized(); // todo name this
 
         // stream sender must be the currentRenter and we are transitioning to the rental phase
 
@@ -532,6 +532,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         if (flowRate <= 0) revert InvalidFlowRate();
         if (!isBidHigher(flowRate, topFlowRate) || flowRate < reserveRate) revert FlowRateTooLow();
         if (msgSender == beneficiary) revert BeneficiaryCannotBid();
+        if (host.isApp(ISuperApp(msgSender))) revert SuperAppCannotBid();
 
         // save this user's bid
         int96 oldTopFlowRate = topFlowRate;
