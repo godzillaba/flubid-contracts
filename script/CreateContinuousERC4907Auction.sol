@@ -30,7 +30,6 @@ contract CreateContinuousERC4907Auction is Script {
         (address auction, address controller) = factory.create({
             acceptedToken: maticx,
             controllerObserverImplementation: erc4907ControllerObserverImpl,
-            beneficiary: account,
             minimumBidFactorWad: uint96(minimumBidFactorWad),
             reserveRate: reserveRate,
             controllerObserverExtraArgs: abi.encode(erc4907, tokenId)

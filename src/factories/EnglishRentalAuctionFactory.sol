@@ -43,7 +43,6 @@ contract EnglishRentalAuctionFactory {
     struct CreateParams {
         ISuperToken acceptedToken;
         address controllerObserverImplementation;
-        address beneficiary;
         uint96 minimumBidFactorWad;
         int96 reserveRate;
         uint64 minRentalDuration;
@@ -92,7 +91,7 @@ contract EnglishRentalAuctionFactory {
             ISuperfluid(host), 
             IConstantFlowAgreementV1(cfa), 
             IRentalAuctionControllerObserver(controllerObserverClone), 
-            params.beneficiary, 
+            msg.sender, // beneficiary
             params.minimumBidFactorWad, 
             params.reserveRate,
             params.minRentalDuration,

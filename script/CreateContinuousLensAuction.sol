@@ -31,7 +31,6 @@ contract CreateContinuousLensAuction is Script {
         (address auction, address controller) = factory.create({
             acceptedToken: maticx,
             controllerObserverImplementation: lensControllerObserverImpl,
-            beneficiary: account,
             minimumBidFactorWad: uint96(minimumBidFactorWad),
             reserveRate: reserveRate,
             controllerObserverExtraArgs: abi.encode(tokenId)

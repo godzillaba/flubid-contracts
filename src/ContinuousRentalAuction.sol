@@ -197,6 +197,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
         require(address(_host) != address(0));
         require(address(_acceptedToken) != address(0));
         require(_beneficiary != address(0));
+        require(!_host.isApp(ISuperApp(_beneficiary)));
 
         // the minimum bid factor must be at least 1
         require(_minimumBidFactorWad >= _wad);

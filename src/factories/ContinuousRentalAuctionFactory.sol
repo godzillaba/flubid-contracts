@@ -56,7 +56,6 @@ contract ContinuousRentalAuctionFactory {
     /// @notice Deploys a continuous rental auction clone and a controller observer clone. Caller will be set as the owner of the controller.
     /// @param acceptedToken The accepted token for the auction.
     /// @param controllerObserverImplementation The address of the controller observer implementation.
-    /// @param beneficiary The beneficiary of the auction.
     /// @param minimumBidFactorWad The minimum bid factor in WAD.
     /// @param reserveRate The reserve rate.
     /// @param controllerObserverExtraArgs ABI encoded additional arguments for the controller observer.
@@ -65,7 +64,6 @@ contract ContinuousRentalAuctionFactory {
     function create(
         ISuperToken acceptedToken,
         address controllerObserverImplementation,
-        address beneficiary,
         uint96 minimumBidFactorWad,
         int96 reserveRate,
         bytes calldata controllerObserverExtraArgs
@@ -83,7 +81,7 @@ contract ContinuousRentalAuctionFactory {
             ISuperfluid(host), 
             IConstantFlowAgreementV1(cfa), 
             IRentalAuctionControllerObserver(controllerObserverClone), 
-            beneficiary, 
+            msg.sender, // beneficiary
             minimumBidFactorWad, 
             reserveRate
         );

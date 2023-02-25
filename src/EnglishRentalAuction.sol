@@ -192,6 +192,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         require(address(_cfa) != address(0));
 
         require(_beneficiary != address(0));
+        require(!_host.isApp(ISuperApp(_beneficiary)));
 
         require(_minimumBidFactorWad >= _wad);
         require(_reserveRate >= 0);
