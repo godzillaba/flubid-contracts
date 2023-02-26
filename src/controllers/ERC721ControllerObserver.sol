@@ -37,8 +37,9 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
     event TokenWithdrawn();
 
     /// @notice Emitted when the auction notifies the controller that the renter has changed
+    /// @param oldRenter The old renter
     /// @param newRenter The new renter
-    event RenterChanged(address indexed newRenter);
+    event RenterChanged(address indexed oldRenter, address indexed newRenter);
 
     /// @notice Error indicating that the caller is not authorized. (some functions are only callable by the owner or the auction contract)
     error Unauthorized();
@@ -118,14 +119,15 @@ abstract contract ERC721ControllerObserver is Initializable, IRentalAuctionContr
 
     /// @notice Called by the rental auction contract when the renter has changed
     /// @dev Only callable by the rental auction contract.
+    /// @param oldRenter The old renter
     /// @param newRenter The new renter
-    function onRenterChanged(address newRenter) external onlyRentalAuction {
-        _onRenterChanged(newRenter);
-        emit RenterChanged(newRenter);
+    function onRenterChanged(address oldRenter, address newRenter) external onlyRentalAuction {
+        _onRenterChanged(oldRenter, newRenter);
+        emit RenterChanged(oldRenter, newRenter);
     }
 
     /// @notice Overridden by inheriting contracts to handle renter changes
     /// @dev THIS FUNCTION MUST NOT REVERT
     /// @param newRenter The new renter
-    function _onRenterChanged(address newRenter) internal virtual;
+    function _onRenterChanged(address oldRenter, address newRenter) internal virtual;
 }

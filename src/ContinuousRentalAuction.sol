@@ -330,7 +330,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             }
 
             // notify controller
-            controllerObserver.onRenterChanged(streamSender);
+            controllerObserver.onRenterChanged(oldTopSender, streamSender);
 
             emit RenterChanged(oldTopSender, streamSender);
         }
@@ -404,7 +404,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             newCtx = acceptedToken.updateFlowWithCtx(beneficiary, newTopRate, newCtx);
 
             // notify controller
-            controllerObserver.onRenterChanged(newTopSender);
+            controllerObserver.onRenterChanged(oldTopSender, newTopSender);
 
             emit RenterChanged(oldTopSender, newTopSender);
         }
@@ -485,7 +485,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);
 
                 // notify controller
-                controllerObserver.onRenterChanged(address(0));
+                controllerObserver.onRenterChanged(oldTopSender, address(0));
             }
 
             emit RenterChanged(oldTopSender, address(0));
@@ -506,7 +506,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
                 newCtx = acceptedToken.updateFlowWithCtx(beneficiary, senderInfo[newTopSender].flowRate, newCtx);
 
                 // notify controller
-                controllerObserver.onRenterChanged(newTopSender);
+                controllerObserver.onRenterChanged(oldTopSender, newTopSender);
             }
 
             emit RenterChanged(oldTopSender, newTopSender);
@@ -541,7 +541,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
 
             // notify controller
-            controllerObserver.onRenterChanged(address(0));
+            controllerObserver.onRenterChanged(_topSender, address(0));
         }
 
         emit Paused();
@@ -562,7 +562,7 @@ contract ContinuousRentalAuction is SuperAppBase, Initializable, IRentalAuction 
             acceptedToken.createFlow(_topSender, senderInfo[_topSender].flowRate);
 
             // notify controller
-            controllerObserver.onRenterChanged(_topSender);
+            controllerObserver.onRenterChanged(address(0), _topSender);
         }
 
         emit Unpaused();

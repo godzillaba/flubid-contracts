@@ -10,7 +10,7 @@ contract ERC4907ControllerObserver is ERC721ControllerObserver {
     /// @notice Handle renter changed by setting the user of the ERC4907 token
     /// @dev The expiration time is set to the maximum value of uint64
     /// @param newRenter The new renter to set as the user of the ERC4907 token
-    function _onRenterChanged(address newRenter) internal override {
+    function _onRenterChanged(address, address newRenter) internal override {
         IERC4907(address(tokenContract)).setUser(tokenId, newRenter, type(uint64).max);
     }
 }

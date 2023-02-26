@@ -105,7 +105,7 @@ contract ContinuousRentalAuctionTest is Test, IRentalAuctionControllerObserver {
         app.unpause();
     }
 
-    function onRenterChanged(address newRenter) public {
+    function onRenterChanged(address oldRenter, address newRenter) public {
         reportedRenter = newRenter;
     }
 

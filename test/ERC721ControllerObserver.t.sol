@@ -17,7 +17,7 @@ contract ERC721Mintable is ERC721 {
 contract TestControllerObserver is ERC721ControllerObserver {
     uint256 onRenterChangedCallNum;
     address reportedRenter;
-    function _onRenterChanged(address newRenter) internal virtual override {}
+    function _onRenterChanged(address,address) internal virtual override {}
 
     function resetReportedRenter() external {
         reportedRenter = address(type(uint160).max);
@@ -40,7 +40,7 @@ contract ERC721ControllerObserverTest is Test, IRentalAuction {
     event AuctionStarted();
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
     event TokenWithdrawn();
-    event RenterChanged(address indexed newRenter);
+    event RenterChanged(address indexed oldRenter, address indexed newRenter);
 
     function setUp() public {
         tokenContract = new ERC721Mintable("Test", "TNFT");
@@ -160,11 +160,11 @@ contract ERC721ControllerObserverTest is Test, IRentalAuction {
     function testOnRenterChanged() public {
         vm.prank(tokenHolder);
         vm.expectRevert(bytes4(keccak256("Unauthorized()")));
-        controllerObserver.onRenterChanged(address(1));
+        controllerObserver.onRenterChanged(address(1), address(2));
 
-        vm.expectEmit(true,false,false,false);
-        emit RenterChanged(address(1));
-        controllerObserver.onRenterChanged(address(1));
+        vm.expectEmit(true,true,false,false);
+        emit RenterChanged(address(1), address(2));
+        controllerObserver.onRenterChanged(address(1), address(2));
     }
 
     uint256 pauseCount;

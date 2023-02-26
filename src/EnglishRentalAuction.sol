@@ -353,7 +353,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
         currentPhaseEndTime = 0;
         topFlowRate = 0;
 
-        controllerObserver.onRenterChanged(address(0));
+        controllerObserver.onRenterChanged(_topBidder, address(0));
 
         // delete flow to beneficiary
         acceptedToken.deleteFlow(address(this), beneficiary);
@@ -393,7 +393,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
 
         currentPhaseEndTime = block.timestamp + maxRentalDuration;
 
-        controllerObserver.onRenterChanged(_topBidder);
+        controllerObserver.onRenterChanged(address(0), _topBidder);
 
         newCtx = acceptedToken.createFlowWithCtx(beneficiary, _topFlowRate, _ctx);
         
@@ -455,7 +455,7 @@ contract EnglishRentalAuction is SuperAppBase, Initializable, IRentalAuction {
             topFlowRate = 0;
             depositClaimed = false;
 
-            controllerObserver.onRenterChanged(address(0));
+            controllerObserver.onRenterChanged(_topBidder, address(0));
 
             // delete flow to beneficiary
             newCtx = acceptedToken.deleteFlowWithCtx(address(this), beneficiary, newCtx);

@@ -8,7 +8,7 @@ import { ERC721ControllerObserver } from "./ERC721ControllerObserver.sol";
 /// @notice Rental auction controller for Lens Profile tokens
 contract LensProfileControllerObserver is ERC721ControllerObserver {  
     /// @notice Do nothing on renter changed  
-    function _onRenterChanged(address) internal pure override {}
+    function _onRenterChanged(address, address) internal pure override {}
 
     /// @notice Post to the Lens Hub
     /// @dev Only callable by the current renter reported by the rental auction contract
