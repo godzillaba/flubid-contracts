@@ -27,6 +27,8 @@ import { SuperTokenV1Library } from "superfluid-finance/contracts/apps/SuperToke
 import { EnglishRentalAuction } from "../src/EnglishRentalAuction.sol";
 import { IRentalAuctionControllerObserver } from "../src/interfaces/IRentalAuctionControllerObserver.sol";
 import { IRentalAuction } from "../src/interfaces/IRentalAuction.sol";
+import {ERC1820RegistryBytecode} from "./ERC1820RegistryBytecode.sol";
+
 
 // TODO: test events
 
@@ -69,6 +71,8 @@ contract EnglishRentalAuctionTest is Test, IRentalAuctionControllerObserver {
     address constant reportedRenterPlaceholder = address(type(uint160).max);
 
     function setUp() public {
+        // erc1820 registry
+        vm.etch(0x1820a4B7618BdE71Dce8cdc73aAB6C95905faD24, new ERC1820RegistryBytecode().code());
         SuperfluidFrameworkDeployer sfDeployer = new SuperfluidFrameworkDeployer();
         sf = sfDeployer.getFramework();
     
