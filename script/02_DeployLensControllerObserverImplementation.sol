@@ -17,7 +17,7 @@ contract DeployLensControllerObserverImplementation is Script {
         
         vm.startBroadcast(privateKey);
 
-        LensProfileControllerObserver controllerImpl = new LensProfileControllerObserver{salt: bytes32(uint256(1))}();
+        LensProfileControllerObserver controllerImpl = new LensProfileControllerObserver{salt: bytes32(uint256(100))}();
 
         console.log("Lens controller implementation deployed to:", address(controllerImpl));
         

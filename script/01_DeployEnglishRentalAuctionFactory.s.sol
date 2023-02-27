@@ -12,10 +12,10 @@ contract DeployEnglishRentalAuctionFactory is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        address sfHost = vm.envAddress("GOERLI_SUPERFLUID_HOST");
-        address sfCfa = vm.envAddress("GOERLI_SUPERFLUID_CFA");
+        address sfHost = vm.envAddress("MUMBAI_SUPERFLUID_HOST");
+        address sfCfa = vm.envAddress("MUMBAI_SUPERFLUID_CFA");
 
-        EnglishRentalAuctionFactory factory = new EnglishRentalAuctionFactory{salt: bytes32(uint256(1))}(sfHost, sfCfa);
+        EnglishRentalAuctionFactory factory = new EnglishRentalAuctionFactory{salt: bytes32(uint256(100))}(sfHost, sfCfa);
 
         console.log("EnglishRentalAuctionFactory deployed to:", address(factory));
 
